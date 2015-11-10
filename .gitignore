@@ -1,4 +1,6 @@
 #just ignore these.
+log.txt
+ndpiReade.o
 .deps/
 Makefile
 Makefile.am

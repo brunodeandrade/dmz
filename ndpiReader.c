@@ -53,6 +53,8 @@
 
 #include <sys/socket.h>
 
+#include <dmz_module.c>
+
 #define MAX_NUM_READER_THREADS     16
 #define IDLE_SCAN_PERIOD           10 /* msec (use detection_tick_resolution = 1000) */
 #define MAX_IDLE_TIME           30000
@@ -1063,6 +1065,9 @@ static unsigned int packet_processing(u_int16_t thread_id,
     return(0);
   }
 
+  //method for printing info, saltar dmz_module.
+  print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
+
   if(flow->detection_completed) return(0);
 
   flow->detected_protocol = ndpi_detection_process_packet(ndpi_thread_info[thread_id].ndpi_struct, ndpi_flow,
@@ -1118,7 +1123,6 @@ static unsigned int packet_processing(u_int16_t thread_id,
 	    flow->detected_protocol.master_protocol = NDPI_PROTOCOL_UNKNOWN;
 	}
       }
-
       printFlow(thread_id, flow);
     }
   }
@@ -2048,6 +2052,7 @@ int main(int argc, char **argv) {
 
   for(i=0; i<num_loops; i++)
     test_lib();
+
 
   if(results_path) free(results_path);
   if(results_file) fclose(results_file);
