@@ -1,0 +1,8 @@
+#just ignore these.
+.deps/
+Makefile
+Makefile.am
+Makefile.in
+Win32/
+ndpiReader
+
