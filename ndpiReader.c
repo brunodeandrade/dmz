@@ -1067,6 +1067,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
 
   //method for printing info, saltar dmz_module.
   print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
+  save_data(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
 
   if(flow->detection_completed) return(0);
 
