@@ -8,7 +8,7 @@ typedef struct ip_node{
 	int tcp_baseline;
 	int udp_baseline;
 	int icmp_baseline;
-	struct baseline *next_IP;
+	struct ip_node *next_IP;
 } ip_node;
 
 ip_node * first_one = NULL;
