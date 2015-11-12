@@ -1066,7 +1066,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
   }
 
   //method for printing info, saltar dmz_module.
-  print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
+  //print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
   save_data(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
 
   if(flow->detection_completed) return(0);
@@ -1336,6 +1336,9 @@ static void printResults(u_int64_t tot_usec) {
 	printf("\tGuessed flow protos:   %-13u\n", cumulative_stats.guessed_flow_protocols);
     }
   }
+
+    //---------------------------Our Print List---------------------------------------------------------------------
+    print_list();
 
   if(json_flag) {
 #ifdef HAVE_JSON_C
@@ -1944,6 +1947,7 @@ static void pcap_packet_callback(u_char *args,
   /* process the packet */
   packet_processing(thread_id, time, vlan_id, iph, iph6,
 		    ip_offset, header->len - ip_offset, header->len);
+
 }
 
 /* ******************************************************************** */
