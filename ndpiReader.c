@@ -1066,8 +1066,9 @@ static unsigned int packet_processing(u_int16_t thread_id,
   }
 
   //method for printing info, saltar dmz_module.
-  //print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
+  print_info(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol),flow->lower_port);
   save_data(flow->upper_name, flow-> bytes, ipProto2Name(flow->protocol));
+  save_port_data(flow->lower_port,flow->bytes);
 
   if(flow->detection_completed) return(0);
 
@@ -1338,7 +1339,8 @@ static void printResults(u_int64_t tot_usec) {
   }
 
     //---------------------------Our Print List---------------------------------------------------------------------
-    print_list();
+    print_ip_list();
+    print_port_list();
 
   if(json_flag) {
 #ifdef HAVE_JSON_C
