@@ -54,8 +54,7 @@ ip_node * create_ip_node(char * ip_name){
 */
 port_node * create_port_node(char * port_name, u_int64_t bytes){
 	port_node * node = (port_node *) malloc (sizeof(port_node));	
-	node->port_name = malloc(sizeof(ch
-		ar) * strlen(port_name));
+	node->port_name = malloc(sizeof(char) * strlen(port_name));
 	strcpy(node->port_name,port_name);
 	node->bytes = bytes;
 
@@ -199,13 +198,13 @@ void print_hash(){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %d\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
 		printf("         UDP\n");
 		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %d\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
 		printf("         ICMP\n");
 		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %d\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
 	}
 	free_hash_list();
 }
