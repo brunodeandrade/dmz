@@ -1340,7 +1340,7 @@ static void printResults(u_int64_t tot_usec) {
     //---------------------------Our Print List---------------------------------------------------------------------
     
     //let this off for now, it's spamming too much.
-    //print_hash();
+    print_hash();
    
 
   if(json_flag) {
