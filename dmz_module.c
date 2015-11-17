@@ -38,7 +38,8 @@ ip_node * create_ip_node(char * ip_name){
 	printf("Criei o ip\n");
 	ip_node * node = (ip_node *) malloc (sizeof(ip_node));	
 	node->ip_name = ip_name;
-	
+	node->tcp_ports = NULL;
+	node->udp_ports = NULL;
 	return node;
 
 }
