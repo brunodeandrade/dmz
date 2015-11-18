@@ -3,12 +3,20 @@
 #include <string.h>
 #include "uthash.h"
 
+typedef int ptype;
+enum { TCP, UDP, ICMP };
+
+typedef int bool;
+enum {true, false};
+
 
 typedef struct port_node{
 	char * port_name;
 	u_int64_t bytes;
 	UT_hash_handle hh;
 	int current_packets;
+	bool learnt;
+	long threshold; // in seconds, defined by poisson or other method
 }port_node;
 
 typedef struct ip_node{
@@ -20,10 +28,21 @@ typedef struct ip_node{
 	UT_hash_handle hh;
 } ip_node;
 
-typedef int bool;
-enum { TCP, UDP, ICMP };
-
 ip_node * hash_list = NULL;
+int wait_alert; //wait time until the throw of an alert, defined by the user
+int learning_time; //learning time of the algorithm, defined by the user
+
+int load_file(){
+	FILE * config_file = fopen("config.txt","r");
+	if(!config_file){
+		printf("ERROR: Could not open file!\n\n\n");
+		return -1;
+	}
+
+	fscanf(config_file,"%d %d",&wait_alert,&learning_time);	
+	fclose(config_file);
+	return 0;
+}
 
 
 void print_info(char * ip_name, int bytes, char * protocol, int lower_port, int packets){
@@ -43,11 +62,7 @@ ip_node * create_ip_node(char * ip_name){
 	node->udp_ports = NULL;
 	node->icmp_ports = NULL;
 	return node;
-
 }
-
-
-
 
 /*
 *Creates a port node
@@ -59,6 +74,7 @@ port_node * create_port_node(char * port_name, u_int64_t bytes, int current_pack
 	strcpy(node->port_name,port_name);
 	node->bytes = bytes;
 	node->current_packets = current_packets;
+	node->learnt = false;
 
 	return node;
 }
@@ -68,7 +84,7 @@ port_node * create_port_node(char * port_name, u_int64_t bytes, int current_pack
 *Inserts a new port in the hash of the node
 *
 */
-void insert_port_in_hash (ip_node * ip_node, bool protocol_type, port_node *port) {
+void insert_port_in_hash (ip_node * ip_node, ptype protocol_type, port_node *port) {
 
 	char *port_name = port->port_name;
 
@@ -93,7 +109,7 @@ void insert_port_in_hash (ip_node * ip_node, bool protocol_type, port_node *port
 *Adds the bytes to a port in the hash of the node
 *
 */
-void find_port_and_increment (ip_node * ip_node, bool protocol_type, port_node * port) {
+void find_port_and_increment (ip_node * ip_node, ptype protocol_type, port_node * port) {
 
 	port_node * findable_port = NULL;
 	switch(protocol_type){
@@ -128,7 +144,7 @@ void find_port_and_increment (ip_node * ip_node, bool protocol_type, port_node *
 void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name , int current_packets){
 
 	ip_node * findable = NULL;
-	bool protocol_type;
+	ptype protocol_type;
 
 	char port_str[10];
 	sprintf(port_str,"%d",port_name);
@@ -212,6 +228,10 @@ void print_hash(){
 		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
 			printf("           Port: %s, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
 	}
+
+	printf("Wait alert is %d and the learning time is %d \n\n\n", wait_alert, learning_time);
 	free_hash_list();
 }
+
+
 

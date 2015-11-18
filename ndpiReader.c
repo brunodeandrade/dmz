@@ -2039,6 +2039,10 @@ void test_lib() {
 int main(int argc, char **argv) {
   int i;
 
+  
+  //-------------------Loading config file for DMZ_MODULE --------------------
+  load_file();
+
   memset(ndpi_thread_info, 0, sizeof(ndpi_thread_info));
   memset(&pcap_start, 0, sizeof(pcap_start));
   memset(&pcap_end, 0, sizeof(pcap_end));
