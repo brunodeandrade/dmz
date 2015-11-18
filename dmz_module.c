@@ -8,6 +8,7 @@ typedef struct port_node{
 	char * port_name;
 	u_int64_t bytes;
 	UT_hash_handle hh;
+	int current_packets;
 }port_node;
 
 typedef struct ip_node{
@@ -25,9 +26,9 @@ enum { TCP, UDP, ICMP };
 ip_node * hash_list = NULL;
 
 
-void print_info(char * ip_name, int bytes, char * protocol, int lower_port){
+void print_info(char * ip_name, int bytes, char * protocol, int lower_port, int packets){
 
-	printf("Upper ip: %s bytes: %i protocol: %s port: %i \n\n", ip_name, bytes, protocol,lower_port);
+	printf("Upper ip: %s bytes: %i protocol: %s port: %i  packets: %d \n\n", ip_name, bytes, protocol,lower_port,packets);
 
 }
 
@@ -52,11 +53,12 @@ ip_node * create_ip_node(char * ip_name){
 *Creates a port node
 *
 */
-port_node * create_port_node(char * port_name, u_int64_t bytes){
+port_node * create_port_node(char * port_name, u_int64_t bytes, int current_packets){
 	port_node * node = (port_node *) malloc (sizeof(port_node));	
 	node->port_name = malloc(sizeof(char) * strlen(port_name));
 	strcpy(node->port_name,port_name);
 	node->bytes = bytes;
+	node->current_packets = current_packets;
 
 	return node;
 }
@@ -66,18 +68,19 @@ port_node * create_port_node(char * port_name, u_int64_t bytes){
 *Inserts a new port in the hash of the node
 *
 */
-void insert_port_in_hash (ip_node * ip_node, char * port_name, int bytes, bool protocol_type) {
+void insert_port_in_hash (ip_node * ip_node, bool protocol_type, port_node *port) {
 
-	port_node *node = create_port_node(port_name,bytes);
+	char *port_name = port->port_name;
+
 	switch(protocol_type){
 		case TCP:
-			HASH_ADD_STR(ip_node->tcp_ports, port_name, node);
+			HASH_ADD_STR(ip_node->tcp_ports, port_name, port);
 			break;
 		case UDP:
-			HASH_ADD_STR(ip_node->udp_ports, port_name, node);
+			HASH_ADD_STR(ip_node->udp_ports, port_name, port);
 			break;
 		case ICMP:
-			HASH_ADD_STR(ip_node->icmp_ports, port_name, node);
+			HASH_ADD_STR(ip_node->icmp_ports, port_name, port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -90,18 +93,18 @@ void insert_port_in_hash (ip_node * ip_node, char * port_name, int bytes, bool p
 *Adds the bytes to a port in the hash of the node
 *
 */
-void find_port_and_increment (ip_node * ip_node, char *port_name, int bytes, bool protocol_type) {
+void find_port_and_increment (ip_node * ip_node, bool protocol_type, port_node * port) {
 
 	port_node * findable_port = NULL;
 	switch(protocol_type){
 		case TCP:
-			HASH_FIND_STR(ip_node->tcp_ports, port_name, findable_port);
+			HASH_FIND_STR(ip_node->tcp_ports, port->port_name, findable_port);
 			break;
 		case UDP:
-			HASH_FIND_STR(ip_node->udp_ports, port_name, findable_port);
+			HASH_FIND_STR(ip_node->udp_ports, port->port_name, findable_port);
 			break;
 		case ICMP:
-			HASH_FIND_STR(ip_node->icmp_ports, port_name, findable_port);
+			HASH_FIND_STR(ip_node->icmp_ports, port->port_name, findable_port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -109,11 +112,12 @@ void find_port_and_increment (ip_node * ip_node, char *port_name, int bytes, boo
 	}
 
 	if(findable_port) {
-		findable_port->bytes += bytes;
+		findable_port->bytes += port->bytes;
+		findable_port->current_packets = port->current_packets;
 	}
 
 	else {
-		insert_port_in_hash(ip_node,port_name,bytes, protocol_type);
+		insert_port_in_hash(ip_node, protocol_type, port);
 	}
 }
 
@@ -121,7 +125,7 @@ void find_port_and_increment (ip_node * ip_node, char *port_name, int bytes, boo
 * Adds an IP node to the hash list
 *
 */
-void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name){
+void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name , int current_packets){
 
 	ip_node * findable = NULL;
 	bool protocol_type;
@@ -142,13 +146,15 @@ void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name){
 
 	HASH_FIND_STR(hash_list,ip_name,findable);
 
+	port_node * port = create_port_node(port_str,bytes, current_packets);
+
 	if(findable){
-		find_port_and_increment(findable,port_str,bytes,protocol_type);
+		find_port_and_increment(findable,protocol_type,port);
 			
 	}else{
-		ip_node * node = create_ip_node(ip_name);
-		insert_port_in_hash(node,port_str,bytes,protocol_type);
-		HASH_ADD_STR(hash_list, ip_name, node);
+		ip_node * ip = create_ip_node(ip_name);
+		insert_port_in_hash(ip,protocol_type,port);
+		HASH_ADD_STR(hash_list, ip_name, ip);
 	}
 }
 
@@ -198,13 +204,13 @@ void print_hash(){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld  Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
 		printf("         UDP\n");
 		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
 		printf("         ICMP\n");
 		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %s, Bytes: %ld\n",irt_port->port_name,irt_port->bytes);
+			printf("           Port: %s, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
 	}
 	free_hash_list();
 }
