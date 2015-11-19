@@ -1,3 +1,5 @@
-15 45
+15 45 450 0.1  
 //First - Wait alert, the time to wait before throwing an alert
 //Second - Learnig Time, the time in wich the learning occurs
+//Third - A static baseline for the system
+//Fourth - Global threshold 

@@ -16,7 +16,10 @@ typedef struct port_node{
 	UT_hash_handle hh;
 	int current_packets;
 	bool learnt;
-	long threshold; // in seconds, defined by poisson or other method
+	float threshold; // in seconds, defined by poisson or other method
+	int wait_alert; //wait time until the throw of an alert
+	int learning_time; //learning time of the algorithm
+	int baseline;//The result of the learning
 }port_node;
 
 typedef struct ip_node{
@@ -24,13 +27,14 @@ typedef struct ip_node{
 	port_node * tcp_ports;
 	port_node * udp_ports;
 	port_node * icmp_ports;
-	int icmp_baseline;
 	UT_hash_handle hh;
 } ip_node;
 
 ip_node * hash_list = NULL;
-int wait_alert; //wait time until the throw of an alert, defined by the user
-int learning_time; //learning time of the algorithm, defined by the user
+int wait_alert_sys; //wait time until the throw of an alert, defined by the user for the whole system
+int learning_time_sys; //learning time of the algorithm, defined by the user for the whole system
+int static_baseline;
+float global_threshold;
 
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
@@ -39,7 +43,7 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d",&wait_alert,&learning_time);	
+	fscanf(config_file,"%d %d %d %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold);	
 	fclose(config_file);
 	return 0;
 }
@@ -229,7 +233,7 @@ void print_hash(){
 			printf("           Port: %s, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
 	}
 
-	printf("Wait alert is %d and the learning time is %d \n\n\n", wait_alert, learning_time);
+	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
 	free_hash_list();
 }
 
