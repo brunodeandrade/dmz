@@ -60,7 +60,11 @@ void print_info(char * ip_name, int bytes, char * protocol, int lower_port, int 
 *
 */
 ip_node * create_ip_node(char * ip_name){
-	ip_node * node = (ip_node *) malloc (sizeof(ip_node));	
+	ip_node * node = (ip_node *) malloc (sizeof(ip_node));
+	if(!node){
+		printf("ip_node was not allocated correctly.\n\n\n");
+		exit(0);
+	}	
 	node->ip_name = ip_name;
 	node->tcp_ports = NULL;
 	node->udp_ports = NULL;
@@ -73,8 +77,13 @@ ip_node * create_ip_node(char * ip_name){
 *
 */
 port_node * create_port_node(char * port_name, u_int64_t bytes, int current_packets){
-	port_node * node = (port_node *) malloc (sizeof(port_node));	
+	port_node * node = (port_node *) malloc (sizeof(port_node));
 	node->port_name = malloc(sizeof(char) * strlen(port_name));
+	if(!node || !node->port_name){
+		printf("port_node or port->port_name were not allocated correctly.\n\n\n");
+		exit(0);
+	}	
+	
 	strcpy(node->port_name,port_name);
 	node->bytes = bytes;
 	node->current_packets = current_packets;
@@ -168,9 +177,8 @@ void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name , int
 
 	port_node * port = create_port_node(port_str,bytes, current_packets);
 
-	if(findable){
-		find_port_and_increment(findable,protocol_type,port);
-			
+	if(findable){		
+		find_port_and_increment(findable,protocol_type,port);			
 	}else{
 		ip_node * ip = create_ip_node(ip_name);
 		insert_port_in_hash(ip,protocol_type,port);
@@ -192,20 +200,26 @@ void free_hash_list(){
 
 		for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
+			HASH_DEL(itr,itr_port);
 			free(itr_port);
 		}
 		for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
+			HASH_DEL(itr,itr_port);
 			free(itr_port);
 		}
 		for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
+			HASH_DEL(itr,itr_port);
 			free(itr_port);
 		}
+
 		next = itr->hh.next;
+		HASH_DEL(hash_list,itr);
 		free(itr);
 	}
 
+	printf("%p \n\n",hash_list);
 	free(hash_list);
 }
 
