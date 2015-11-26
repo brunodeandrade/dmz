@@ -13,7 +13,6 @@ enum {true, false};
 
 typedef struct port_node{
 	int port_name;
-	u_int64_t bytes;
 	UT_hash_handle hh;
 	int current_packets;
 	bool learnt;
@@ -24,7 +23,8 @@ typedef struct port_node{
 }port_node;
 
 typedef struct ip_node{
-	char * ip_name;//primary key
+	int upper_ip;//primary key
+	char * ip_name;
 	port_node * tcp_ports;
 	port_node * udp_ports;
 	port_node * icmp_ports;
@@ -50,9 +50,9 @@ int load_file(){
 }
 
 
-void print_info(char * ip_name, int bytes, u_short protocol, int lower_port, int packets){
+void print_info(long ip_number, char *ip_name, u_short protocol, int lower_port, int packets){
 
-	printf("Upper ip: %s bytes: %i protocol: %d port: %i  packets: %d \n\n", ip_name, bytes, protocol,lower_port,packets);
+	printf("Upper number: %ld, Upper name: %s  protocol: %d port: %i  packets: %d \n\n", ip_number, ip_name, protocol,lower_port,packets);
 
 }
 
@@ -60,13 +60,14 @@ void print_info(char * ip_name, int bytes, u_short protocol, int lower_port, int
 *Creates a new ip_node
 *
 */
-ip_node * create_ip_node(char * ip_name){
+ip_node * create_ip_node(char * ip_name, int upper_ip){
 	ip_node * node = (ip_node *) malloc (sizeof(ip_node));
 	if(!node){
 		printf("ip_node was not allocated correctly.\n\n\n");
 		exit(0);
 	}	
 	node->ip_name = ip_name;
+	node->upper_ip = upper_ip;
 	node->tcp_ports = NULL;
 	node->udp_ports = NULL;
 	node->icmp_ports = NULL;
@@ -77,7 +78,7 @@ ip_node * create_ip_node(char * ip_name){
 *Creates a port node
 *
 */
-port_node * create_port_node(int port_name, u_int64_t bytes, int current_packets){
+port_node * create_port_node(int port_name, int current_packets){
 	port_node * node = (port_node *) malloc (sizeof(port_node));
 
 	if(!node){
@@ -86,7 +87,6 @@ port_node * create_port_node(int port_name, u_int64_t bytes, int current_packets
 	}	
 	
 	node->port_name = port_name;
-	node->bytes = bytes;
 	node->current_packets = current_packets;
 	node->learnt = false;
 
@@ -142,7 +142,6 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, port_node 
 	}
 
 	if(findable_port) {
-		findable_port->bytes += port->bytes;
 		findable_port->current_packets += port->current_packets;
 	}
 
@@ -155,21 +154,20 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, port_node 
 * Adds an IP node to the hash list
 *
 */
-void add_to_hash(char * ip_name, int bytes, u_short protocol_id, int port_name , int current_packets){
+void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_name , int current_packets){
 
 	ip_node * findable = NULL;
 
+	HASH_FIND_INT(hash_list,&upper_ip,findable);
 
-	HASH_FIND_STR(hash_list,ip_name,findable);
-
-	port_node * port = create_port_node(port_name,bytes, current_packets);
+	port_node * port = create_port_node(port_name, current_packets);
 
 	if(findable){		
 		find_port_and_increment(findable,protocol_id,port);			
 	}else{
-		ip_node * ip = create_ip_node(ip_name);
+		ip_node * ip = create_ip_node(ip_name,upper_ip);
 		insert_port_in_hash(ip,protocol_id,port);
-		HASH_ADD_STR(hash_list, ip_name, ip);
+		HASH_ADD_INT(hash_list, upper_ip, ip);
 	}
 }
 
@@ -178,8 +176,8 @@ void add_to_hash(char * ip_name, int bytes, u_short protocol_id, int port_name ,
 * Free Hash List
 */
 void free_hash_list(){
-	ip_node * itr,* next;
-	port_node * itr_port, *next_port;
+	ip_node * itr = NULL,* next = NULL;
+	port_node * itr_port = NULL, *next_port = NULL;
 	int i = 0;
 	
 	for(itr = hash_list; itr!= NULL;itr=next){
@@ -203,6 +201,7 @@ void free_hash_list(){
 
 		next = itr->hh.next;
 		HASH_DEL(hash_list,itr);
+
 		free(itr);
 	}
 	free(hash_list);
@@ -223,13 +222,13 @@ void print_hash(){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Bytes: %ld  Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d\n",irt_port->port_name,irt_port->current_packets);
 		printf("         UDP\n");
 		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d\n",irt_port->port_name,irt_port->current_packets);
 		printf("         ICMP\n");
 		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Bytes: %ld Current Packets: %d\n",irt_port->port_name,irt_port->bytes,irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d\n",irt_port->port_name,irt_port->current_packets);
 	}
 
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
