@@ -182,29 +182,28 @@ void free_hash_list(){
 	
 	for(itr = hash_list; itr!= NULL;itr=next){
 
-
 		for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
-			HASH_DEL(itr,itr_port);
+			HASH_DEL(itr->tcp_ports,itr_port);
 			free(itr_port);
 		}
+
 		for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
-			HASH_DEL(itr,itr_port);
+			HASH_DEL(itr->udp_ports,itr_port);
 			free(itr_port);
 		}
 		for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
 			next_port = itr_port->hh.next;
-			HASH_DEL(itr,itr_port);
+			HASH_DEL(itr->icmp_ports,itr_port);
 			free(itr_port);
 		}
+		
 
 		next = itr->hh.next;
 		HASH_DEL(hash_list,itr);
-
-		free(itr);
+		free(itr);		
 	}
-	free(hash_list);
 }
 
 
