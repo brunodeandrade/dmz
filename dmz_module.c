@@ -3,6 +3,7 @@
 #include <string.h>
 #include "uthash.h"
 #include <sys/socket.h>
+#include <sys/time.h>
 
 typedef int ptype;
 enum { TCP, UDP, ICMP };
@@ -20,6 +21,7 @@ typedef struct port_node{
 	int wait_alert; //wait time until the throw of an alert
 	int learning_time; //learning time of the algorithm
 	int baseline;//The result of the learning
+	struct timeval time_of_detection; 
 }port_node;
 
 typedef struct ip_node{
@@ -89,6 +91,7 @@ port_node * create_port_node(int port_name, int current_packets){
 	node->port_name = port_name;
 	node->current_packets = current_packets;
 	node->learnt = false;
+	gettimeofday(&node->time_of_detection,NULL);
 
 	return node;
 }
@@ -221,7 +224,7 @@ void print_hash(){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d\n",irt_port->port_name,irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d, \t Detected Time: %d\n",irt_port->port_name,irt_port->current_packets,irt_port->time_of_detection);
 		printf("         UDP\n");
 		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
 			printf("           Port: %d, Current Packets: %d\n",irt_port->port_name,irt_port->current_packets);
