@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "uthash.h"
+#include <sys/socket.h>
 
 typedef int ptype;
 enum { TCP, UDP, ICMP };
@@ -49,9 +50,9 @@ int load_file(){
 }
 
 
-void print_info(char * ip_name, int bytes, char * protocol, int lower_port, int packets){
+void print_info(char * ip_name, int bytes, u_short protocol, int lower_port, int packets){
 
-	printf("Upper ip: %s bytes: %i protocol: %s port: %i  packets: %d \n\n", ip_name, bytes, protocol,lower_port,packets);
+	printf("Upper ip: %s bytes: %i protocol: %d port: %i  packets: %d \n\n", ip_name, bytes, protocol,lower_port,packets);
 
 }
 
@@ -97,18 +98,18 @@ port_node * create_port_node(int port_name, u_int64_t bytes, int current_packets
 *Inserts a new port in the hash of the node
 *
 */
-void insert_port_in_hash (ip_node * ip_node, ptype protocol_type, port_node *port) {
+void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *port) {
 
 	int port_name = port->port_name;
 
-	switch(protocol_type){
-		case TCP:
+	switch(protocol_id){
+		case IPPROTO_TCP:
 			HASH_ADD_INT(ip_node->tcp_ports, port_name, port);
 			break;
-		case UDP:
+		case IPPROTO_UDP:
 			HASH_ADD_INT(ip_node->udp_ports, port_name, port);
 			break;
-		case ICMP:
+		case IPPROTO_ICMP:
 			HASH_ADD_INT(ip_node->icmp_ports, port_name, port);
 			break;
 		default: 
@@ -122,17 +123,17 @@ void insert_port_in_hash (ip_node * ip_node, ptype protocol_type, port_node *por
 *Adds the bytes to a port in the hash of the node
 *
 */
-void find_port_and_increment (ip_node * ip_node, ptype protocol_type, port_node * port) {
+void find_port_and_increment (ip_node * ip_node, u_short protocol_id, port_node * port) {
 
 	port_node * findable_port = NULL;
-	switch(protocol_type){
-		case TCP:
+	switch(protocol_id){
+		case IPPROTO_TCP:
 			HASH_FIND_INT(ip_node->tcp_ports, &(port->port_name), findable_port);
 			break;
-		case UDP:
+		case IPPROTO_UDP:
 			HASH_FIND_INT(ip_node->udp_ports, &(port->port_name), findable_port);
 			break;
-		case ICMP:
+		case IPPROTO_ICMP:
 			HASH_FIND_INT(ip_node->icmp_ports, &(port->port_name), findable_port);
 			break;
 		default: 
@@ -146,7 +147,7 @@ void find_port_and_increment (ip_node * ip_node, ptype protocol_type, port_node 
 	}
 
 	else {
-		insert_port_in_hash(ip_node, protocol_type, port);
+		insert_port_in_hash(ip_node, protocol_id, port);
 	}
 }
 
@@ -154,30 +155,20 @@ void find_port_and_increment (ip_node * ip_node, ptype protocol_type, port_node 
 * Adds an IP node to the hash list
 *
 */
-void add_to_hash(char * ip_name, int bytes, char * protocol, int port_name , int current_packets){
+void add_to_hash(char * ip_name, int bytes, u_short protocol_id, int port_name , int current_packets){
 
 	ip_node * findable = NULL;
-	ptype protocol_type;
 
-	if(strcmp(protocol,"TCP") == 0){
-		protocol_type = TCP;
-	}
-	else if(strcmp(protocol,"UDP") == 0){
-		protocol_type = UDP;
-	}
-	else if(strcmp(protocol,"ICMP") == 0){
-		protocol_type = ICMP;
-	}
 
 	HASH_FIND_STR(hash_list,ip_name,findable);
 
 	port_node * port = create_port_node(port_name,bytes, current_packets);
 
 	if(findable){		
-		find_port_and_increment(findable,protocol_type,port);			
+		find_port_and_increment(findable,protocol_id,port);			
 	}else{
 		ip_node * ip = create_ip_node(ip_name);
-		insert_port_in_hash(ip,protocol_type,port);
+		insert_port_in_hash(ip,protocol_id,port);
 		HASH_ADD_STR(hash_list, ip_name, ip);
 	}
 }
@@ -215,8 +206,6 @@ void free_hash_list(){
 		free(itr);
 	}
 	free(hash_list);
-
-	printf("The free was successful \n\n");
 }
 
 
