@@ -33,11 +33,15 @@ typedef struct ip_node{
 	UT_hash_handle hh;
 } ip_node;
 
-ip_node * hash_list = NULL;
+ip_node * to_learn_list = NULL;
+ip_node * learnt_list = NULL;
+
 int wait_alert_sys; //wait time until the throw of an alert, defined by the user for the whole system
 int learning_time_sys; //learning time of the algorithm, defined by the user for the whole system
 int static_baseline;
 float global_threshold;
+float R0_BASELINE;
+float R1_BASELINE;
 
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
@@ -46,7 +50,13 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d %d %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold);	
+	fscanf(config_file,"%d %d %d %f %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&R0_BASELINE,&R1_BASELINE);
+
+	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
+		printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
+		exit (-1);
+	}
+
 	fclose(config_file);
 	return 0;
 }
@@ -161,7 +171,7 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 
 	ip_node * findable = NULL;
 
-	HASH_FIND_INT(hash_list,&upper_ip,findable);
+	HASH_FIND_INT(to_learn_list,&upper_ip,findable);
 
 	port_node * port = create_port_node(port_name, current_packets);
 
@@ -170,7 +180,7 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 	}else{
 		ip_node * ip = create_ip_node(ip_name,upper_ip);
 		insert_port_in_hash(ip,protocol_id,port);
-		HASH_ADD_INT(hash_list, upper_ip, ip);
+		HASH_ADD_INT(to_learn_list, upper_ip, ip);
 	}
 }
 
@@ -178,7 +188,7 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 /*
 * Free Hash List
 */
-void free_hash_list(){
+void free_hash_list(ip_node * hash_list){
 	ip_node * itr = NULL,* next = NULL;
 	port_node * itr_port = NULL, *next_port = NULL;
 	int i = 0;
@@ -220,7 +230,7 @@ void print_hash(){
 	int i = 0;
 
 	printf("\n\tHash:\n");
-	for(itr = hash_list; itr!= NULL;itr= itr->hh.next){
+	for(itr = to_learn_list; itr!= NULL;itr= itr->hh.next){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
@@ -234,7 +244,8 @@ void print_hash(){
 	}
 
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
-	free_hash_list();
+	free_hash_list(to_learn_list);
+	free_hash_list(learnt_list);
 }
 
 
