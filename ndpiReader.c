@@ -2042,7 +2042,11 @@ int main(int argc, char **argv) {
   
   //-------------------Loading config file for DMZ_MODULE --------------------
   load_file();
+  pthread_t continuous_learning_t;
+  const char *t_name = "Continuous_learning_thread";
+  pthread_create(&continuous_learning_t, NULL, continuous_learning, (void*)t_name);
 
+  //--------------------------------------------------------------------------
   memset(ndpi_thread_info, 0, sizeof(ndpi_thread_info));
   memset(&pcap_start, 0, sizeof(pcap_start));
   memset(&pcap_end, 0, sizeof(pcap_end));
@@ -2061,7 +2065,6 @@ int main(int argc, char **argv) {
   }
 
   signal(SIGINT, sigproc);
-
   for(i=0; i<num_loops; i++)
     test_lib();
 

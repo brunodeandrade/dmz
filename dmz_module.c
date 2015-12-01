@@ -11,7 +11,7 @@ typedef int ptype;
 enum { TCP, UDP, ICMP };
 
 typedef int bool;
-enum {true, false};
+enum {false, true};
 
 
 typedef struct port_node{
@@ -102,6 +102,8 @@ port_node * create_port_node(int port_name, int current_packets){
 		exit(0);
 	}	
 	
+	node->new_baseline = 0;
+	node->old_baseline = 0;
 	node->port_name = port_name;
 	node->current_packets = current_packets;
 	node->learnt = false;
@@ -202,6 +204,7 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 	ip_node * findable = NULL;
 
 	HASH_FIND_INT(to_learn_list,&upper_ip,findable);
+	//HASH_FIND_INT(learnt_list ,&upper_ip,findable);
 
 	port_node * port = create_port_node(port_name, current_packets);
 
@@ -285,7 +288,9 @@ bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 	time_t time_of_detection_sec = (time_t) time_of_detection.tv_sec;
 	time_t now_sec = (time_t)now.tv_sec;
 
-	if((now_sec - time_of_detection_sec) > (learning_time*POLL_TIME))
+	printf("now_sec - time_of_detection_sec: %d, learning_time*POLL_TIME: %d\n",(now_sec - time_of_detection_sec), (learning_time_sys*POLL_TIME));
+
+	if((now_sec - time_of_detection_sec) > (learning_time_sys*POLL_TIME))
 		return false;
 	else
 		return true;	
@@ -308,7 +313,7 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 
 	HASH_FIND_INT(learnt_list, &ip->upper_ip, found);
 	if(found){
-		insert_port_in_hash(found,protocol_id,port);
+		//insert_port_in_hash(found,protocol_id,port); //BUGGING!
 	}else{
 		found = (ip_node *) malloc(sizeof(ip_node));
 		memcpy(found,ip,sizeof(ip));
@@ -316,7 +321,6 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 		found->udp_ports = NULL;
 		found->icmp_ports = NULL;
 		insert_port_in_hash(found,protocol_id,port);
-		int upper_ip = ip->upper_ip;
 		HASH_ADD_INT(learnt_list,upper_ip,found);
 	}
 	remove_port(ip, port, protocol_id);
@@ -328,37 +332,52 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 
 
 /*
+* Set baselines
+*/
+void set_baselines(port_node * port_node){
+	port_node->old_baseline = R0_BASELINE * port_node -> new_baseline;
+	port_node->new_baseline = R1_BASELINE * port_node -> current_packets + port_node->old_baseline;
+	port_node-> current_packets = 0;
+}
+
+/*
 * Learning Control - Poll Iteration
 */
-void continuous_learning(){
-	ip_node * itr = NULL,* next = NULL;
-	port_node * itr_port = NULL, *next_port = NULL;
-	
-	for(itr = to_learn_list; itr!= NULL;itr=next){
-		for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-				//TODO Learning step for this baseline goes here 
-			}else{
-				learnt_control(itr,itr_port,IPPROTO_TCP);
+void * continuous_learning(){
+	while(true){
+		ip_node * itr = NULL,* next = NULL;
+		port_node * itr_port = NULL, *next_port = NULL;
+		for(itr = to_learn_list; itr!= NULL;itr=next){
+			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+					//TODO Learning step for this baseline goes here 
+					set_baselines(itr_port);
+				}else{
+					learnt_control(itr,itr_port,IPPROTO_TCP);
+				}
+				next_port = itr_port->hh.next;			
 			}
-			next_port = itr_port->hh.next;			
-		}
-		for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-				//TODO Learning step for this baseline goes here 
-			}else{
-				learnt_control(itr,itr_port,IPPROTO_UDP);
+			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+					//TODO Learning step for this baseline goes here 
+					set_baselines(itr_port);
+				}else{
+					learnt_control(itr,itr_port,IPPROTO_UDP);
+				}
+				next_port = itr_port->hh.next;			
 			}
-			next_port = itr_port->hh.next;			
-		}
-		for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-				//TODO Learning step for this baseline goes here 
-			}else{
-				learnt_control(itr,itr_port,IPPROTO_ICMP);
+			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
+				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+					//TODO Learning step for this baseline goes here 
+					set_baselines(itr_port);
+				}else{
+					learnt_control(itr,itr_port,IPPROTO_ICMP);
+				}
+				next_port = itr_port->hh.next;			
 			}
-			next_port = itr_port->hh.next;			
 		}
+		printf("Sleeping...\n");
+		sleep(POLL_TIME);
 	}
 }
 
