@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#define POLL_TIME 10
+
 typedef int ptype;
 enum { TCP, UDP, ICMP };
 
@@ -19,8 +21,9 @@ typedef struct port_node{
 	bool learnt;
 	float threshold; // in seconds, defined by poisson or other method
 	int wait_alert; //wait time until the throw of an alert
-	int learning_time; //learning time of the algorithm
-	int baseline;//The result of the learning
+	int learning_time; //learning time of the algorithm, in polls not seconds
+	int new_baseline;//The result of the learning
+	int old_baseline;
 	struct timeval time_of_detection; 
 }port_node;
 
@@ -42,6 +45,7 @@ int static_baseline;
 float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
+
 
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
@@ -105,6 +109,32 @@ port_node * create_port_node(int port_name, int current_packets){
 
 	return node;
 }
+
+/*
+* Remove port from list
+*/
+void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
+
+	int port_name = port->port_name;
+
+	switch(protocol_id){
+		case IPPROTO_TCP:
+			HASH_DEL(ip->tcp_ports, port);
+			break;
+		case IPPROTO_UDP:
+			HASH_DEL(ip->udp_ports, port);
+			break;
+		case IPPROTO_ICMP:
+			HASH_DEL(ip->icmp_ports, port);
+			break;
+		default: 
+			printf("not known protocol\n");
+			break;
+	}
+	
+}
+
+
 
 
 /*
@@ -246,6 +276,90 @@ void print_hash(){
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
 	free_hash_list(to_learn_list);
 	free_hash_list(learnt_list);
+}
+
+bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
+	struct timeval now;
+	gettimeofday(&now,NULL);
+
+	time_t time_of_detection_sec = (time_t) time_of_detection.tv_sec;
+	time_t now_sec = (time_t)now.tv_sec;
+
+	if((now_sec - time_of_detection_sec) > (learning_time*POLL_TIME))
+		return false;
+	else
+		return true;	
+
+}
+
+
+/*
+* Learning 
+* Params - The port to have the baseline learning step done
+*/
+
+
+/*
+* Learnt Control 
+* Remove from the to_learn_list and add to the learnt_list
+*/
+void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
+	ip_node * found = NULL;
+
+	HASH_FIND_INT(learnt_list, &ip->upper_ip, found);
+	if(found){
+		insert_port_in_hash(found,protocol_id,port);
+	}else{
+		found = (ip_node *) malloc(sizeof(ip_node));
+		memcpy(found,ip,sizeof(ip));
+		found->tcp_ports = NULL;
+		found->udp_ports = NULL;
+		found->icmp_ports = NULL;
+		insert_port_in_hash(found,protocol_id,port);
+		int upper_ip = ip->upper_ip;
+		HASH_ADD_INT(learnt_list,upper_ip,found);
+	}
+	remove_port(ip, port, protocol_id);
+	if(ip->tcp_ports == NULL && ip->udp_ports == NULL && ip->icmp_ports == NULL){
+		HASH_DEL(to_learn_list,ip);
+	}
+
+}
+
+
+/*
+* Learning Control - Poll Iteration
+*/
+void continuous_learning(){
+	ip_node * itr = NULL,* next = NULL;
+	port_node * itr_port = NULL, *next_port = NULL;
+	
+	for(itr = to_learn_list; itr!= NULL;itr=next){
+		for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+			}else{
+				learnt_control(itr,itr_port,IPPROTO_TCP);
+			}
+			next_port = itr_port->hh.next;			
+		}
+		for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+			}else{
+				learnt_control(itr,itr_port,IPPROTO_UDP);
+			}
+			next_port = itr_port->hh.next;			
+		}
+		for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+			}else{
+				learnt_control(itr,itr_port,IPPROTO_ICMP);
+			}
+			next_port = itr_port->hh.next;			
+		}
+	}
 }
 
 

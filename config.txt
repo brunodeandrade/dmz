@@ -1,4 +1,4 @@
-15 45 450 0.1 0.7 0.6
+15 45 450 0.1 0.1 0.6
 //First - WAIT_ALERT, the number of polls the system will wait before throwing an alert
 //Second - LEARNING_POLLS, the number of polls the system will use to learn the network behaviour
 //Third - A static baseline for the system
