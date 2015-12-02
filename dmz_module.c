@@ -165,6 +165,33 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 }
 
 /*
+* Search port in a hash.
+*/
+
+port_node * find_port(ip_node * ip_node, u_short protocol_id, port_node *port){
+
+		port_node * findable_port = NULL;
+		int port_name = port->port_name;
+
+		switch(protocol_id){
+		case IPPROTO_TCP:
+			HASH_FIND_INT(ip_node->tcp_ports, &(port->port_name), findable_port);
+			break;
+		case IPPROTO_UDP:
+			HASH_FIND_INT(ip_node->udp_ports, &(port->port_name), findable_port);
+			break;
+		case IPPROTO_ICMP:
+			HASH_FIND_INT(ip_node->icmp_ports, &(port->port_name), findable_port);
+			break;
+		default: 
+			printf("not known protocol\n");
+			break;
+		}
+
+	return findable_port;
+}
+
+/*
 *Adds the bytes to a port in the hash of the node
 *
 */
@@ -204,7 +231,6 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 	ip_node * findable = NULL;
 
 	HASH_FIND_INT(to_learn_list,&upper_ip,findable);
-	//HASH_FIND_INT(learnt_list ,&upper_ip,findable);
 
 	port_node * port = create_port_node(port_name, current_packets);
 
@@ -313,8 +339,12 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 
 	HASH_FIND_INT(learnt_list, &ip->upper_ip, found);
 	if(found){
-		//insert_port_in_hash(found,protocol_id,port); //BUGGING!
+		printf("found!\n");
+		if(find_port(found, protocol_id, port))
+			insert_port_in_hash(found,protocol_id,port); //BUGGING
+
 	}else{
+		printf("not found!\n");
 		found = (ip_node *) malloc(sizeof(ip_node));
 		memcpy(found,ip,sizeof(ip));
 		found->tcp_ports = NULL;
@@ -336,7 +366,8 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 */
 void set_baselines(port_node * port_node){
 	port_node->old_baseline = R0_BASELINE * port_node -> new_baseline;
-	port_node->new_baseline = R1_BASELINE * port_node -> current_packets + port_node->old_baseline;
+	port_node->new_baseline = (R1_BASELINE * port_node -> current_packets) + port_node->old_baseline;
+	printf("baselines: new: %d, old: %d\n", port_node->new_baseline, port_node->old_baseline);
 	port_node-> current_packets = 0;
 }
 
@@ -349,6 +380,7 @@ void * continuous_learning(){
 		port_node * itr_port = NULL, *next_port = NULL;
 		for(itr = to_learn_list; itr!= NULL;itr=next){
 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+				printf("port_tcp: %d\n", itr_port->port_name);
 				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 					//TODO Learning step for this baseline goes here 
 					set_baselines(itr_port);
@@ -358,6 +390,7 @@ void * continuous_learning(){
 				next_port = itr_port->hh.next;			
 			}
 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+				printf("port_udp: %d\n", itr_port->port_name);
 				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 					//TODO Learning step for this baseline goes here 
 					set_baselines(itr_port);
