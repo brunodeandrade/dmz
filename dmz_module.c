@@ -36,6 +36,12 @@ typedef struct ip_node{
 	UT_hash_handle hh;
 } ip_node;
 
+// ip to be used in the warning list.
+typedef struct ip_name_alert{
+	char *ip_name;
+	UT_hash_handle hh;
+} ip_name_alert;
+
 ip_node * to_learn_list = NULL;
 ip_node * learnt_list = NULL;
 
@@ -192,21 +198,46 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, port_node *port){
 }
 
 /*
+* Find ip's for a given PORT
+*/
+ip_name_alert * find_ips_by_port(int port_name){
+
+	ip_name_alert * ip_name_list = NULL;
+	ip_node * itr = NULL;
+	port_node * tcp_port = NULL, * udp_port = NULL, * icmp_port = NULL;
+
+	for(itr = learnt_list; itr!= NULL;itr= itr->hh.next){
+		HASH_FIND_INT(itr->tcp_ports, &(port_name), tcp_port);
+		HASH_FIND_INT(itr->udp_ports, &(port_name), udp_port);
+		HASH_FIND_INT(itr->icmp_ports, &(port_name), icmp_port);
+
+		if(tcp_port || udp_port || icmp_port){
+			ip_name_alert ip_name = (ip_name_alert)malloc(sizeof(ip_name_alert));
+			ip_name->ip_name = itr->ip_name;
+			HASH_ADD_INT(ip_name_list, itr->upper_ip, ip_name);
+		}
+	}
+
+	return ip_name_list;
+}
+
+
+/*
 *Adds the bytes to a port in the hash of the node
 *
 */
-void find_port_and_increment (ip_node * ip_node, u_short protocol_id, port_node * port) {
+void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_name, int current_packets) {
 
 	port_node * findable_port = NULL;
 	switch(protocol_id){
 		case IPPROTO_TCP:
-			HASH_FIND_INT(ip_node->tcp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
 			break;
 		case IPPROTO_UDP:
-			HASH_FIND_INT(ip_node->udp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
 			break;
 		case IPPROTO_ICMP:
-			HASH_FIND_INT(ip_node->icmp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -214,10 +245,11 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, port_node 
 	}
 
 	if(findable_port) {
-		findable_port->current_packets += port->current_packets;
+		findable_port->current_packets += current_packets;
 	}
 
 	else {
+		port_node * port = create_port_node(port_name, current_packets);
 		insert_port_in_hash(ip_node, protocol_id, port);
 	}
 }
@@ -232,11 +264,11 @@ void add_to_hash(int upper_ip, char * ip_name, u_short protocol_id, int port_nam
 
 	HASH_FIND_INT(to_learn_list,&upper_ip,findable);
 
-	port_node * port = create_port_node(port_name, current_packets);
-
+	
 	if(findable){		
-		find_port_and_increment(findable,protocol_id,port);			
+		find_port_and_increment(findable,protocol_id, port_name, current_packets);			
 	}else{
+		port_node * port = create_port_node(port_name, current_packets);
 		ip_node * ip = create_ip_node(ip_name,upper_ip);
 		insert_port_in_hash(ip,protocol_id,port);
 		HASH_ADD_INT(to_learn_list, upper_ip, ip);
