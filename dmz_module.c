@@ -39,6 +39,7 @@ typedef struct ip_node{
 // ip to be used in the warning list.
 typedef struct ip_name_alert{
 	char *ip_name;
+	int upper_ip;
 	UT_hash_handle hh;
 } ip_name_alert;
 
@@ -128,12 +129,15 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 	switch(protocol_id){
 		case IPPROTO_TCP:
 			HASH_DEL(ip->tcp_ports, port);
+			free(port);
 			break;
 		case IPPROTO_UDP:
 			HASH_DEL(ip->udp_ports, port);
+			free(port);
 			break;
 		case IPPROTO_ICMP:
 			HASH_DEL(ip->icmp_ports, port);
+			free(port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -174,20 +178,19 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 * Search port in a hash.
 */
 
-port_node * find_port(ip_node * ip_node, u_short protocol_id, port_node *port){
+port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 
 		port_node * findable_port = NULL;
-		int port_name = port->port_name;
 
 		switch(protocol_id){
 		case IPPROTO_TCP:
-			HASH_FIND_INT(ip_node->tcp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
 			break;
 		case IPPROTO_UDP:
-			HASH_FIND_INT(ip_node->udp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
 			break;
 		case IPPROTO_ICMP:
-			HASH_FIND_INT(ip_node->icmp_ports, &(port->port_name), findable_port);
+			HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -212,9 +215,10 @@ ip_name_alert * find_ips_by_port(int port_name){
 		HASH_FIND_INT(itr->icmp_ports, &(port_name), icmp_port);
 
 		if(tcp_port || udp_port || icmp_port){
-			ip_name_alert ip_name = (ip_name_alert)malloc(sizeof(ip_name_alert));
+			ip_name_alert *ip_name = (ip_name_alert*) malloc(sizeof(ip_name_alert));
 			ip_name->ip_name = itr->ip_name;
-			HASH_ADD_INT(ip_name_list, itr->upper_ip, ip_name);
+			int upper_ip = itr->upper_ip;
+			HASH_ADD_INT(ip_name_list, upper_ip, ip_name);
 		}
 	}
 
@@ -228,21 +232,7 @@ ip_name_alert * find_ips_by_port(int port_name){
 */
 void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_name, int current_packets) {
 
-	port_node * findable_port = NULL;
-	switch(protocol_id){
-		case IPPROTO_TCP:
-			HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
-			break;
-		case IPPROTO_UDP:
-			HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
-			break;
-		case IPPROTO_ICMP:
-			HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
-			break;
-		default: 
-			printf("not known protocol\n");
-			break;
-	}
+	port_node * findable_port = find_port(ip_node, protocol_id, port_name);
 
 	if(findable_port) {
 		findable_port->current_packets += current_packets;
@@ -372,7 +362,7 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 	HASH_FIND_INT(learnt_list, &ip->upper_ip, found);
 	if(found){
 		printf("found!\n");
-		if(find_port(found, protocol_id, port) == NULL)
+		if(find_port(found, protocol_id, port->port_name) == NULL)
 			insert_port_in_hash(found,protocol_id,port); //BUGGING
 
 	}else{
