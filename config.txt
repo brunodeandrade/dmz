@@ -1,7 +1,8 @@
-15 2 450 0.1 0.69 0.3
+5 2 450 0.1 0.69 0.3 0.001
 //First - WAIT_ALERT, the number of polls the system will wait before throwing an alert
 //Second - LEARNING_POLLS, the number of polls the system will use to learn the network behaviour
 //Third - A static baseline for the system
 //Fourth - Global threshold 
 //Fifth - RO_BASELINE
 //Sixth - R1_BASELINE
+//Seventh - Threshold

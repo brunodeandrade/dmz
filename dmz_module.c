@@ -4,8 +4,14 @@
 #include "uthash.h"
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <math.h>
+#include <tgmath.h>
 
 #define POLL_TIME 10
+#define MAX_CACHE 1000000
+
+long double cache_log[MAX_CACHE];
+long double cache_sum[MAX_CACHE];
 
 typedef int ptype;
 enum { TCP, UDP, ICMP };
@@ -19,11 +25,11 @@ typedef struct port_node{
 	UT_hash_handle hh;
 	int current_packets;
 	bool learnt;
-	float threshold; // in seconds, defined by poisson or other method
+	float poisson_result; //defined by poisson
 	int wait_alert; //wait time until the throw of an alert
 	int learning_time; //learning time of the algorithm, in polls not seconds
-	int new_baseline;//The result of the learning
-	int old_baseline;
+	float new_baseline;//The result of the learning
+	float old_baseline;
 	struct timeval time_of_detection; 
 }port_node;
 
@@ -53,6 +59,37 @@ float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
 
+int init_cache()        {
+        int i=1;
+
+        for(; i<MAX_CACHE; i++)
+                cache_log[i] = logl((long double)i);
+
+        memset(cache_sum, 0x0, MAX_CACHE);
+
+}
+
+long double poisson(int k, int lam)     {
+
+        int c = 1;
+        long double pvalue = 0;
+        long double sum = 0;
+
+        if ( cache_sum[k] )
+                sum = cache_sum[k];
+        else {
+                while(c <= k)   {
+                        sum += cache_log[c];
+                        c++;
+                }
+                cache_sum[k] = sum;
+        }
+
+        pvalue = cache_log[2] + k*cache_log[lam] - sum - lam;
+
+        return pvalue;
+}
+
 
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
@@ -61,7 +98,8 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d %d %f %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&R0_BASELINE,&R1_BASELINE);
+	fscanf(config_file,"%d %d %d %f %f %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,
+		&R0_BASELINE,&R1_BASELINE,&global_threshold);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
 		printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
@@ -69,6 +107,7 @@ int load_file(){
 	}
 
 	fclose(config_file);
+	init_cache();
 	return 0;
 }
 
@@ -111,6 +150,7 @@ port_node * create_port_node(int port_name, int current_packets){
 	
 	node->new_baseline = 0;
 	node->old_baseline = 0;
+	node->wait_alert = 0;
 	node->port_name = port_name;
 	node->current_packets = current_packets;
 	node->learnt = false;
@@ -315,13 +355,13 @@ void print_hash(){
 		printf("\t%d - IP: %s\n",i++,itr->ip_name);
 		printf("         TCP\n");
 		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %d \t Detected Time: %d\n",irt_port->port_name,irt_port->current_packets,irt_port->new_baseline,irt_port->time_of_detection);
+			printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",irt_port->port_name,irt_port->current_packets,irt_port->new_baseline,irt_port->time_of_detection);
 		printf("         UDP\n");
 		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %d\n",irt_port->port_name, irt_port->new_baseline, irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d, Baseline: %f\n",irt_port->port_name, irt_port->new_baseline, irt_port->current_packets);
 		printf("         ICMP\n");
 		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %d\n",irt_port->port_name,irt_port->new_baseline,irt_port->current_packets);
+			printf("           Port: %d, Current Packets: %d, Baseline: %f\n",irt_port->port_name,irt_port->new_baseline,irt_port->current_packets);
 	}
 
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
@@ -363,12 +403,11 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 	if(found){
 		printf("found!\n");
 		if(find_port(found, protocol_id, port->port_name) == NULL)
-			insert_port_in_hash(found,protocol_id,port); //BUGGING
+			insert_port_in_hash(found,protocol_id,port); 
 
 	}else{
 		printf("not found!\n");
 		found = (ip_node *) malloc(sizeof(ip_node));
-		//memcpy(found,ip,sizeof(ip));
 		found->upper_ip = ip->upper_ip;
 		found->ip_name = ip->ip_name;
 		found->tcp_ports = NULL;
@@ -380,7 +419,7 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 	if(ip->tcp_ports == NULL && ip->udp_ports == NULL && ip->icmp_ports == NULL){
 		HASH_DEL(to_learn_list,ip);
 	}
-	printf("learnt baselines: new: %d, old: %d\n", port->new_baseline, port->old_baseline);
+	printf("learnt baselines: new: %f, old: %f\n", port->new_baseline, port->old_baseline);
 }
 
 
@@ -390,18 +429,16 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 void set_baselines(port_node * port_node){
 	port_node->old_baseline = R0_BASELINE * port_node -> new_baseline;
 	port_node->new_baseline = (R1_BASELINE * port_node -> current_packets) + port_node->old_baseline;
-	printf("set baselines: new: %d, old: %d\n", port_node->new_baseline, port_node->old_baseline);
+	printf("set baselines: new: %f, old: %f\n", port_node->new_baseline, port_node->old_baseline);
 	port_node-> current_packets = 0; //doesnt work, need to improve this.
 }
 
-/*
-* Learning Control - Poll Iteration
-*/
-void * continuous_learning(){
-	while(true){
-		ip_node * itr = NULL,* next = NULL;
-		port_node * itr_port = NULL, *next_port = NULL;
-		for(itr = to_learn_list; itr!= NULL;itr=next){
+
+void iterate_to_learn(ip_node *itr) {
+
+	ip_node * next = NULL;
+	port_node * itr_port = NULL, *next_port = NULL;
+		for(; itr!= NULL;itr=next){
 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
 				printf("port_tcp: %d\n", itr_port->port_name);
 				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
@@ -435,6 +472,50 @@ void * continuous_learning(){
 
 			next = itr->hh.next;
 		}
+}
+
+void verify_poisson(port_node *itr_port) {
+	itr_port->poisson_result = 1 - (1 + 1/poisson(itr_port->current_packets, itr_port->new_baseline));
+		if(itr_port->poisson_result > global_threshold) {
+			itr_port->wait_alert++;
+			if(itr_port->wait_alert >= wait_alert_sys) {
+				printf("Alert: Port %d is suspect!!",itr_port->port_name);
+			}					
+		}else if(itr_port->wait_alert > 0){
+			itr_port->wait_alert = 0;
+		}
+}
+
+void iterate_learnt(ip_node *itr) {
+
+	ip_node * next = NULL;
+	port_node * itr_port = NULL, *next_port = NULL;
+		for(; itr!= NULL;itr=next){
+			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+				verify_poisson(itr_port);
+				next_port = itr_port->hh.next;			
+			}
+
+			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+				verify_poisson(itr_port);
+				next_port = itr_port->hh.next;			
+			}
+			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
+				verify_poisson(itr_port);
+				next_port = itr_port->hh.next;			
+			}
+
+			next = itr->hh.next;
+		}
+}
+
+/*
+* Learning Control - Poll Iteration
+*/
+void * continuous_learning(){
+	while(true){
+		iterate_to_learn(to_learn_list);
+		iterate_learnt(learnt_list);
 		printf("Sleeping...\n");
 		sleep(POLL_TIME);
 	}
