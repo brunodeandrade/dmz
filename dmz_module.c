@@ -42,13 +42,6 @@ typedef struct ip_node{
 	UT_hash_handle hh;
 } ip_node;
 
-// ip to be used in the warning list.
-typedef struct ip_name_alert{
-	char *ip_name;
-	int upper_ip;
-	UT_hash_handle hh;
-} ip_name_alert;
-
 ip_node * to_learn_list = NULL;
 ip_node * learnt_list = NULL;
 
@@ -243,11 +236,12 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 /*
 * Find ip's for a given PORT
 */
-ip_name_alert * find_ips_by_port(int port_name){
+void print_ips_by_port(int port_name){
 
-	ip_name_alert * ip_name_list = NULL;
 	ip_node * itr = NULL;
 	port_node * tcp_port = NULL, * udp_port = NULL, * icmp_port = NULL;
+
+	printf("ALERT! IP'S SUSPICIOUS: \n");
 
 	for(itr = learnt_list; itr!= NULL;itr= itr->hh.next){
 		HASH_FIND_INT(itr->tcp_ports, &(port_name), tcp_port);
@@ -255,14 +249,9 @@ ip_name_alert * find_ips_by_port(int port_name){
 		HASH_FIND_INT(itr->icmp_ports, &(port_name), icmp_port);
 
 		if(tcp_port || udp_port || icmp_port){
-			ip_name_alert *ip_name = (ip_name_alert*) malloc(sizeof(ip_name_alert));
-			ip_name->ip_name = itr->ip_name;
-			int upper_ip = itr->upper_ip;
-			HASH_ADD_INT(ip_name_list, upper_ip, ip_name);
+			printf("\t - %s\n",itr->ip_name);
 		}
 	}
-
-	return ip_name_list;
 }
 
 
@@ -479,7 +468,7 @@ void verify_poisson(port_node *itr_port) {
 		if(itr_port->poisson_result > global_threshold) {
 			itr_port->wait_alert++;
 			if(itr_port->wait_alert >= wait_alert_sys) {
-				printf("Alert: Port %d is suspect!!",itr_port->port_name);
+				print_ips_by_port(itr_port->port_name);
 			}					
 		}else if(itr_port->wait_alert > 0){
 			itr_port->wait_alert = 0;
