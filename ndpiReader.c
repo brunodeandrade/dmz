@@ -1067,7 +1067,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
 
   //method for printing info, saltar dmz_module.
   // print_info(flow->upper_ip, flow->upper_name, flow->protocol,flow->lower_port,flow->packets);
-  add_to_hash(flow->upper_ip,flow->lower_ip, flow->upper_name, flow->protocol,(int)flow->lower_port,flow->packets);
+  add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,(int)flow->lower_port,flow->packets);
 
   if(flow->detection_completed) return(0);
 
