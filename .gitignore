@@ -2,7 +2,6 @@
 log.txt
 ndpiReader.o
 .deps/
-Makefile
 Makefile.am
 Makefile.in
 Win32/
