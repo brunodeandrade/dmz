@@ -24,6 +24,7 @@ typedef struct ip_alert{
 	int upper_ip;
 	char * ip_name;
 	int packets;
+	UT_hash_handle hh;
 } ip_alert;
 
 typedef struct port_node{
@@ -45,7 +46,7 @@ typedef struct ip_node{
 	char * ip_name;
 	port_node * tcp_ports;
 	port_node * udp_ports;
-	port_node * icmp_ports;
+	port_node * icmp_ports;// It's a code not a port
 	UT_hash_handle hh;
 } ip_node;
 
@@ -101,7 +102,7 @@ int load_file(){
 	}
 
 	fscanf(config_file,"%d %d %d %f %f %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,
-		&R0_BASELINE,&R1_BASELINE,&global_threshold);
+		&R0_BASELINE,&R1_BASELINE);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
 		printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
@@ -127,8 +128,8 @@ void print_info(long ip_number, char *ip_name, u_short protocol, int lower_port,
 ip_node * create_ip_node(char * ip_name, int lower_ip){
 	ip_node * node = (ip_node *) calloc (1,sizeof(ip_node));
 	if(!node){
-		printf("ip_node was not allocated correctly.\n\n\n");
-		exit(0);
+		printf("ip_node was not allocated correctly.\n\n\n");		
+		return NULL;
 	}	
 	node->ip_name = ip_name;
 	node->lower_ip = lower_ip;
@@ -147,7 +148,7 @@ port_node * create_port_node(int port_name, int current_packets){
 
 	if(!node){
 		printf("port_node was not allocated correctly.\n\n\n");
-		exit(0);
+		return NULL;
 	}	
 	
 	node->new_baseline = 0;
@@ -167,19 +168,20 @@ port_node * create_port_node(int port_name, int current_packets){
 void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 
 	int port_name = port->port_name;
+	port_node *tmp_next = NULL, *tmp_prev = NULL;
 
 	switch(protocol_id){
 		case IPPROTO_TCP:
+			tmp_next = port->hh.next;
+			tmp_prev = port->hh.prev;
+			tmp_prev -> hh.next = tmp_next;
 			HASH_DEL(ip->tcp_ports, port);
-			free(port);
 			break;
 		case IPPROTO_UDP:
 			HASH_DEL(ip->udp_ports, port);
-			free(port);
 			break;
 		case IPPROTO_ICMP:
 			HASH_DEL(ip->icmp_ports, port);
-			free(port);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -222,23 +224,22 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 
 port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 
-		port_node * findable_port = NULL;
+	port_node * findable_port = NULL;
 
-		switch(protocol_id){
-		case IPPROTO_TCP:
-			HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
-			break;
-		case IPPROTO_UDP:
-			HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
-			break;
-		case IPPROTO_ICMP:
-			HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
-			break;
-		default: 
-			printf("not known protocol\n");
-			break;
-		}
-
+	switch(protocol_id){
+	case IPPROTO_TCP:
+		HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
+		break;
+	case IPPROTO_UDP:
+		HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
+		break;
+	case IPPROTO_ICMP:
+		HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
+		break;
+	default: 
+		printf("not known protocol\n");
+		break;
+	}
 	return findable_port;
 }
 
@@ -265,7 +266,7 @@ void print_ips_by_port(int port_name){
 		top_senders[i].packets = 0;
 	}
 
-	printf("ALERT! IP'S SUSPICIOUS: \n");
+	printf("ALERT! PORT SUSPICIOUS: %d\n",port_name);
 
 	for(itr = learnt_list; itr!= NULL;itr= itr->hh.next){
 		int pckts = 0;		
@@ -296,7 +297,7 @@ void print_ips_by_port(int port_name){
 *
 */
 void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_name, int current_packets) {
-
+	
 	port_node * findable_port = find_port(ip_node, protocol_id, port_name);
 
 	if(findable_port) {
@@ -305,7 +306,10 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 
 	else {
 		port_node * port = create_port_node(port_name, current_packets);
-		insert_port_in_hash(ip_node, protocol_id, port);
+		if(port)
+			insert_port_in_hash(ip_node, protocol_id, port);
+		else
+			printf("Not allocated.\n");
 	}
 }
 
@@ -313,16 +317,15 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 * Adds an IP node to the hash list
 
 */
-void add_to_hash(int upper_ip,int lower_ip, char * ip_name, u_short protocol_id, int port_name , int current_packets){
+void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name, u_short protocol_id, int port_name , int current_packets){
 
 	ip_node * findable = NULL;
-
 
 	HASH_FIND_INT(learnt_list,&lower_ip,findable);
 
 	
 	if(findable){		
-		find_port_and_increment(findable,protocol_id, port_name, current_packets);			
+		find_port_and_increment(findable,protocol_id, port_name, current_packets);
 	}else{
 
 		findable = NULL;
@@ -333,7 +336,7 @@ void add_to_hash(int upper_ip,int lower_ip, char * ip_name, u_short protocol_id,
 			find_port_and_increment(findable,protocol_id, port_name, current_packets);			
 		}else{
 			port_node * port = create_port_node(port_name, current_packets);
-			ip_node * ip = create_ip_node(ip_name,lower_ip);
+			ip_node * ip = create_ip_node(lower_name,lower_ip);
 			insert_port_in_hash(ip,protocol_id,port);
 			HASH_ADD_INT(to_learn_list, lower_ip, ip);
 		}
@@ -411,7 +414,6 @@ bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 	time_t time_of_detection_sec = (time_t) time_of_detection.tv_sec;
 	time_t now_sec = (time_t)now.tv_sec;
 
-	printf("now_sec - time_of_detection_sec: %d, learning_time*POLL_TIME: %d\n",(now_sec - time_of_detection_sec), (learning_time_sys*POLL_TIME));
 
 	if((now_sec - time_of_detection_sec) > (learning_time_sys*POLL_TIME))
 		return false;
@@ -436,12 +438,10 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 
 	HASH_FIND_INT(learnt_list, &ip->lower_ip, found);
 	if(found){
-		printf("found!\n");
 		if(find_port(found, protocol_id, port->port_name) == NULL)
 			insert_port_in_hash(found,protocol_id,port); 
 
 	}else{
-		printf("not found!\n");
 		found = (ip_node *) calloc(1,sizeof(ip_node));
 		found->lower_ip = ip->lower_ip;
 		found->ip_name = ip->ip_name;
@@ -450,11 +450,17 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 		found->icmp_ports = NULL;
 		insert_port_in_hash(found,protocol_id,port);
 		HASH_ADD_INT(learnt_list,lower_ip,found);
-	}(ip, port, protocol_id);
-	if(ip->tcp_ports == NULL && ip->udp_ports == NULL && ip->icmp_ports == NULL){
-		HASH_DEL(to_learn_list,ip);
 	}
-	printf("learnt baselines: new: %f, old: %f\n", port->new_baseline, port->old_baseline);
+
+/*	if(ip->tcp_ports == NULL && ip->udp_ports == NULL && ip->icmp_ports == NULL){
+		HASH_DEL(to_learn_list,ip);
+		printf("Deletei\n");
+	}else {
+		printf("removendo\n");
+		remove_port(ip,port,protocol_id);
+		printf("Rmeovi\n");
+	}*/
+	// printf("learnt baselines: new: %f, old: %f\n", port->new_baseline, port->old_baseline);
 }
 
 
@@ -462,51 +468,59 @@ void learnt_control(ip_node * ip, port_node * port, u_short protocol_id){
 * Set baselines
 */
 void set_baselines(port_node * port_node){
-	port_node->old_baseline = R0_BASELINE * port_node -> new_baseline;
-	port_node->new_baseline = (R1_BASELINE * port_node -> current_packets) + port_node->old_baseline;
-	printf("set baselines: new: %f, old: %f\n", port_node->new_baseline, port_node->old_baseline);
-	port_node-> current_packets = 0; //doesnt work, need to improve this.
+	if(port_node->current_packets > 0){
+
+		port_node->old_baseline = R0_BASELINE * port_node->new_baseline;
+		port_node->new_baseline = (R1_BASELINE * port_node->current_packets) + port_node->old_baseline;
+	}
+	port_node->current_packets = 0;
 }
 
 
 void iterate_to_learn(ip_node *itr) {
 
-	ip_node * next = NULL;
-	port_node * itr_port = NULL, *next_port = NULL;
-		for(; itr!= NULL;itr=next){
-			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-				printf("port_tcp: %d\n", itr_port->port_name);
-				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-					//TODO Learning step for this baseline goes here 
-					set_baselines(itr_port);
-				}else{
-					learnt_control(itr,itr_port,IPPROTO_TCP);
-				}
-				next_port = itr_port->hh.next;			
+	ip_node * current_ip = NULL, *tmp_ip = NULL;
+	port_node * current_port = NULL, *tmp_port = NULL;
+	printf("Iteration to_learn:\n");
+	HASH_ITER(hh, itr, current_ip, tmp_ip){
+	//for(; itr!= NULL;itr=next){
+		HASH_ITER(hh, current_ip->tcp_ports, current_port, tmp_port){
+		//for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(current_port->time_of_detection,current_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+				set_baselines(current_port);
+			}else{
+				learnt_control(current_ip,current_port,IPPROTO_TCP);
 			}
-
-			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-				printf("port_udp: %d\n", itr_port->port_name);
-				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-					//TODO Learning step for this baseline goes here 
-					set_baselines(itr_port);
-				}else{
-					learnt_control(itr,itr_port,IPPROTO_UDP);
-				}
-				next_port = itr_port->hh.next;			
-			}
-			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-				if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-					//TODO Learning step for this baseline goes here 
-					set_baselines(itr_port);
-				}else{
-					learnt_control(itr,itr_port,IPPROTO_ICMP);
-				}
-				next_port = itr_port->hh.next;			
-			}
-
-			next = itr->hh.next;
+			printf("\nport_tcp: %d, new_baseline: %f\n", current_port->port_name,current_port->new_baseline);
 		}
+
+		current_port = NULL;
+		tmp_port = NULL;
+		HASH_ITER(hh, current_ip->udp_ports, current_port, tmp_port){
+		//for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(current_port->time_of_detection,current_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+				set_baselines(current_port);
+			}else{
+				learnt_control(current_ip,current_port,IPPROTO_UDP);
+			}
+			printf("\nport_udp: %d, new_baseline: %f\n", current_port->port_name,current_port->new_baseline);
+		}
+
+		current_port = NULL;
+		tmp_port = NULL;
+		HASH_ITER(hh, current_ip->icmp_ports, current_port, tmp_port){
+		//for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+			if(still_has_to_learn(current_port->time_of_detection,current_port->learning_time)){
+				//TODO Learning step for this baseline goes here 
+				set_baselines(current_port);
+			}else{
+				learnt_control(current_ip,current_port,IPPROTO_ICMP);
+			}
+			printf("\nport_icmp: %d, new_baseline: %f\n", current_port->port_name,current_port->new_baseline);
+		}
+	}
 }
 
 void verify_poisson(port_node *itr_port) {
@@ -526,17 +540,21 @@ void iterate_learnt(ip_node *itr) {
 
 	ip_node * next = NULL;
 	port_node * itr_port = NULL, *next_port = NULL;
+	printf("\nIteration learnt:\n");
 		for(; itr!= NULL;itr=next){
 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+				printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
 
 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+				printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
 			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
+				printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
@@ -549,11 +567,14 @@ void iterate_learnt(ip_node *itr) {
 * Learning Control - Poll Iteration
 */
 void * continuous_learning(){
+	int i = 0;
 	while(true){
+		printf("\n POLL %d\n",i);
 		iterate_to_learn(to_learn_list);
 		iterate_learnt(learnt_list);
 		printf("Sleeping...\n");
 		sleep(POLL_TIME);
+		i++;
 	}
 }
 
