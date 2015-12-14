@@ -19,6 +19,7 @@ enum { TCP, UDP, ICMP };
 
 typedef int bool;
 enum {false, true};
+enum {DYNAMIC, STATIC};
 
 typedef struct ip_alert{
 	int upper_ip;
@@ -29,6 +30,7 @@ typedef struct ip_alert{
 
 typedef struct port_node{
 	int port_name;
+	char * ip_name;
 	int current_packets;
 	bool learnt;
 	long double poisson_result; //defined by poisson
@@ -61,6 +63,10 @@ int static_baseline;
 float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
+
+int package_threshold; // a package_threshold, if the current_package * package_threshold is > than baseline, should alert.
+int verify_config; // should tell which verify technique the system is using (0 is poisson, 1 is baseline).
+int learning_mode;
 
 int init_cache()        {
         int i=1;
@@ -101,8 +107,8 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d %d %f %f %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,
-		&R0_BASELINE,&R1_BASELINE);
+	fscanf(config_file,"%d %d %d %f %d %f %f %d %d",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&package_threshold,
+		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
 		printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
@@ -143,7 +149,7 @@ ip_node * create_ip_node(char * ip_name, int lower_ip){
 *Creates a port node
 *
 */
-port_node * create_port_node(int port_name, int current_packets){
+port_node * create_port_node(int port_name, int current_packets, char * ip_name){
 	port_node * node = (port_node *) calloc (1,sizeof(port_node));
 
 	if(!node){
@@ -151,6 +157,7 @@ port_node * create_port_node(int port_name, int current_packets){
 		return NULL;
 	}	
 	
+	node->ip_name = ip_name;
 	node->new_baseline = 0;
 	node->old_baseline = 0;
 	node->wait_alert = 0;
@@ -243,7 +250,7 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 * Find ip's for a given PORT
 * TMP!!!!!!
 */
-void print_ips_by_port(int port_name){
+void print_ips_by_port(port_node * port){
 
 	ip_node * itr = NULL;
 	port_node * tcp_port = NULL, * udp_port = NULL, * icmp_port = NULL;
@@ -263,13 +270,13 @@ void print_ips_by_port(int port_name){
 		top_senders[i].packets = 0;
 	}
 
-	printf("ALERT! PORT SUSPICIOUS: %d\n",port_name);
+	printf("ALERT! PORT SUSPICIOUS: %d\n, from ip: %s",ntohs(port->port_name), port->ip_name);
 
 	for(itr = ip_list; itr!= NULL;itr= itr->hh.next){
 		int pckts = 0;		
-		HASH_FIND_INT(itr->tcp_ports, &(port_name), tcp_port);
-		HASH_FIND_INT(itr->udp_ports, &(port_name), udp_port);
-		HASH_FIND_INT(itr->icmp_ports, &(port_name), icmp_port);
+		HASH_FIND_INT(itr->tcp_ports, &(port->port_name), tcp_port);
+		HASH_FIND_INT(itr->udp_ports, &(port->port_name), udp_port);
+		HASH_FIND_INT(itr->icmp_ports, &(port->port_name), icmp_port);
 
 		if(tcp_port){
 			pckts += tcp_port->current_packets;
@@ -302,7 +309,7 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 	}
 
 	else {
-		port_node * port = create_port_node(port_name, current_packets);
+		port_node * port = create_port_node(port_name, current_packets, ip_node->ip_name);
 		if(port)
 			insert_port_in_hash(ip_node, protocol_id, port);
 		else
@@ -324,7 +331,7 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 	if(findable){		
 		find_port_and_increment(findable,protocol_id, port_name, current_packets);
 	}else{
-		port_node * port = create_port_node(port_name, current_packets);
+		port_node * port = create_port_node(port_name, current_packets, lower_name);
 		ip_node * ip = create_ip_node(lower_name,lower_ip);
 		insert_port_in_hash(ip,protocol_id,port);
 		HASH_ADD_INT(ip_list, lower_ip, ip);
@@ -426,22 +433,59 @@ void set_baselines(port_node * port_node){
 */
 
 void verify_poisson(port_node *itr_port) {
+
 	printf("current packets: %d\n", itr_port->current_packets);
 	if(itr_port->current_packets == 0)
-		itr_port->current_packets == 1;
+		itr_port->current_packets = 1;
 
 	itr_port->poisson_result = 1 - (1 + 1/poisson(itr_port->current_packets, itr_port->new_baseline));
 	printf("poisson %Lf\n", itr_port->poisson_result);
 	if(itr_port->poisson_result > global_threshold) {
 		itr_port->wait_alert++;
 		if(itr_port->wait_alert >= wait_alert_sys) {
-			print_ips_by_port(itr_port->port_name);
+			print_ips_by_port(itr_port);
 		}					
 	}else if(itr_port->wait_alert > 0){
 		itr_port->wait_alert = 0;
 	}
 	itr_port->current_packets = 0;
 }
+
+/*
+* verifiy if baseline is above package_threshold
+*/
+void verify_baseline(port_node *port){
+	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	if(port->current_packets > (port->new_baseline * package_threshold)){
+		port->wait_alert++;
+		if(port->wait_alert >= wait_alert_sys) {
+			print_ips_by_port(port);
+		}	
+	} else if(port->wait_alert > 0){
+		port->wait_alert = 0;
+	} else {
+		if (learning_mode == DYNAMIC)
+			set_baselines(port);
+	}
+	port->current_packets = 0;
+}
+
+/*
+* Verify if flow is above threshold
+*/
+
+void verify_flow(port_node *port){
+	//printf("config: %d\n", verify_config);
+	switch (verify_config){
+		case 0: 
+			verify_poisson(port);
+			break;
+		case 1:
+			verify_baseline(port);
+			break;
+	}
+}
+
 
 /*
 * Iterate over the ip_list and check if the port has learned.
@@ -454,7 +498,7 @@ void iterate_to_learn(ip_node *itr) {
 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
 				//printf("port_tcp: %d\n", itr_port->port_name);
 				if(itr_port->learnt){
-					verify_poisson(itr_port);
+					verify_flow(itr_port);
 				}else{
 					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 						set_baselines(itr_port);
@@ -468,7 +512,7 @@ void iterate_to_learn(ip_node *itr) {
 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
 				//printf("port_udp: %d\n", itr_port->port_name);
 				if(itr_port->learnt){
-					verify_poisson(itr_port);
+					verify_flow(itr_port);
 				}else{
 					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 						set_baselines(itr_port);
@@ -480,7 +524,7 @@ void iterate_to_learn(ip_node *itr) {
 			}
 			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
 				if(itr_port->learnt){
-					verify_poisson(itr_port);
+					verify_flow(itr_port);
 				}else{
 					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 						set_baselines(itr_port);
