@@ -23,23 +23,23 @@ enum {DYNAMIC, STATIC};
 
 typedef struct ip_alert{
 	int upper_ip;
-	char * ip_name;
+	char * upper_name;
 	int packets;
 	UT_hash_handle hh;
 } ip_alert;
 
 typedef struct port_node{
 	int port_name;
-	char * ip_name;
 	int current_packets;
 	bool learnt;
+	bool is_suspicious;
 	long double poisson_result; //defined by poisson
 	int wait_alert; //wait time until the throw of an alert
 	int learning_time; //learning time of the algorithm, in polls not seconds
 	float new_baseline;//The result of the learning
 	float old_baseline;
 	struct timeval time_of_detection;
-	ip_alert *alert_node;
+	ip_alert *upper_ips;
 	UT_hash_handle hh;
 }port_node;
 
@@ -149,21 +149,24 @@ ip_node * create_ip_node(char * ip_name, int lower_ip){
 *Creates a port node
 *
 */
-port_node * create_port_node(int port_name, int current_packets, char * ip_name){
+port_node * create_port_node(int port_name, int current_packets){
 	port_node * node = (port_node *) calloc (1,sizeof(port_node));
 
 	if(!node){
 		printf("port_node was not allocated correctly.\n\n\n");
 		return NULL;
 	}	
+
 	
-	node->ip_name = ip_name;
+	node->upper_ips = NULL;
 	node->new_baseline = 0;
 	node->old_baseline = 0;
 	node->wait_alert = 0;
 	node->port_name = port_name;
 	node->current_packets = current_packets;
 	node->learnt = false;
+	node->is_suspicious = false;
+	
 	gettimeofday(&node->time_of_detection,NULL);
 
 	return node;
@@ -192,9 +195,6 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 	}
 	
 }
-
-
-
 
 /*
 *Inserts a new port in the hash of the node
@@ -246,17 +246,26 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 	return findable_port;
 }
 
+int cmpfunc (const void * a, const void * b) {
+
+	ip_alert *ip_alert_a = (ip_alert *)a;
+	ip_alert *ip_alert_b = (ip_alert *)b;
+
+	return ( ip_alert_b->packets - ip_alert_a->packets );
+}
+
+
 /*
 * Find ip's for a given PORT
-* TMP!!!!!!
 */
 void print_ips_by_port(port_node * port){
+	printf("ALERT! PORT SUSPICIOUS: %d\n",ntohs(port->port_name));
 
-	ip_node * itr = NULL;
-	port_node * tcp_port = NULL, * udp_port = NULL, * icmp_port = NULL;
-
+	ip_alert * itr = port->upper_ips, *next = NULL;
 	ip_alert * top_senders = NULL;
-	top_senders = (ip_alert*)calloc(NUMBER_TOP_SENDERS,sizeof(ip_alert));
+	unsigned int number_of_upper_ips = HASH_COUNT(itr);
+
+	top_senders = (ip_alert*)calloc(number_of_upper_ips,sizeof(ip_alert));
 
 	if(!top_senders){
 		printf("Couldn't allocate top_senders\n");
@@ -264,35 +273,45 @@ void print_ips_by_port(port_node * port){
 	}
 
 	int i = 0;
-	for(i;i<NUMBER_TOP_SENDERS;i++){
-		top_senders[i].ip_name = NULL;
-		top_senders[i].upper_ip = 0;
-		top_senders[i].packets = 0;
+	for(itr; itr!= NULL && i < number_of_upper_ips;itr=next,i++){
+		top_senders[i].upper_name = itr->upper_name;
+		top_senders[i].upper_ip = itr->upper_ip;
+		top_senders[i].packets = itr->packets;
+		next = itr->hh.next;	
 	}
 
-	printf("ALERT! PORT SUSPICIOUS: %d\n, from ip: %s",ntohs(port->port_name), port->ip_name);
+	qsort(top_senders,number_of_upper_ips,sizeof(ip_alert),cmpfunc);
 
-	for(itr = ip_list; itr!= NULL;itr= itr->hh.next){
-		int pckts = 0;		
-		HASH_FIND_INT(itr->tcp_ports, &(port->port_name), tcp_port);
-		HASH_FIND_INT(itr->udp_ports, &(port->port_name), udp_port);
-		HASH_FIND_INT(itr->icmp_ports, &(port->port_name), icmp_port);
-
-		if(tcp_port){
-			pckts += tcp_port->current_packets;
-		}else if(udp_port){
-			pckts += udp_port->current_packets;
-		}else if(icmp_port){
-			pckts += icmp_port->current_packets;
+	i = 0;
+	for(i; i < number_of_upper_ips;i++) {
+		if(i < NUMBER_TOP_SENDERS) {
+			printf("\t %d - IP: %s",i+1,top_senders[i].upper_name);
 		}
-
-		for(i;i<NUMBER_TOP_SENDERS;i++){
+		else {
+			break;
 		}
-
-		pckts = 0;
-		tcp_port = udp_port = icmp_port = NULL;
-
 	}
+
+}
+
+void find_upper_ip_and_increment (ip_alert *upper_list, int upper_ip, char *upper_name,  int current_packets) {
+
+	ip_alert *findable_upper = NULL;
+	HASH_FIND_INT(upper_list, &upper_ip, findable_upper);
+	if(findable_upper) {
+		findable_upper->packets += current_packets;
+	}
+	else {
+		findable_upper = (ip_alert *)calloc(1,sizeof(ip_alert));
+		if(!findable_upper){
+			printf("Could not allocate alert!\n");
+			return;		}
+		findable_upper->upper_ip = upper_ip;
+		findable_upper->upper_name = upper_name;
+		findable_upper->packets = current_packets;
+		HASH_ADD_INT(upper_list,upper_ip,findable_upper);
+	}
+
 }
 
 
@@ -300,16 +319,20 @@ void print_ips_by_port(port_node * port){
 *Adds the bytes to a port in the hash of the node
 *
 */
-void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_name, int current_packets) {
+void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_name, int current_packets, int upper_ip, char *upper_name) {
 	
 	port_node * findable_port = find_port(ip_node, protocol_id, port_name);
 
 	if(findable_port) {
 		findable_port->current_packets += current_packets;
+		if(findable_port->is_suspicious){
+			find_upper_ip_and_increment(findable_port->upper_ips,upper_ip,upper_name,current_packets);
+		}
+
 	}
 
 	else {
-		port_node * port = create_port_node(port_name, current_packets, ip_node->ip_name);
+		port_node * port = create_port_node(port_name, current_packets);
 		if(port)
 			insert_port_in_hash(ip_node, protocol_id, port);
 		else
@@ -329,9 +352,9 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 
 	
 	if(findable){		
-		find_port_and_increment(findable,protocol_id, port_name, current_packets);
+		find_port_and_increment(findable,protocol_id, port_name, current_packets,upper_ip,upper_name);
 	}else{
-		port_node * port = create_port_node(port_name, current_packets, lower_name);
+		port_node * port = create_port_node(port_name, current_packets);
 		ip_node * ip = create_ip_node(lower_name,lower_ip);
 		insert_port_in_hash(ip,protocol_id,port);
 		HASH_ADD_INT(ip_list, lower_ip, ip);
@@ -373,7 +396,18 @@ void free_hash_list(ip_node * hash_list){
 	}
 }
 
-
+/*
+* Free Hash List
+*/
+void free_alert_list(ip_alert * hash_list){
+	ip_alert * itr = NULL,* next = NULL;
+	
+	for(itr = hash_list; itr!= NULL;itr=next){
+		next = itr->hh.next;
+		HASH_DEL(hash_list,itr);
+		free(itr);		
+	}
+}
 
 /*
 * Print Hash
@@ -442,11 +476,14 @@ void verify_poisson(port_node *itr_port) {
 	printf("poisson %Lf\n", itr_port->poisson_result);
 	if(itr_port->poisson_result > global_threshold) {
 		itr_port->wait_alert++;
+		itr_port->is_suspicious = true;
 		if(itr_port->wait_alert >= wait_alert_sys) {
 			print_ips_by_port(itr_port);
 		}					
 	}else if(itr_port->wait_alert > 0){
 		itr_port->wait_alert = 0;
+		itr_port->is_suspicious = false;
+		free_alert_list(itr_port->upper_ips);
 	}
 	itr_port->current_packets = 0;
 }
@@ -458,11 +495,14 @@ void verify_baseline(port_node *port){
 	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
+		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
 			print_ips_by_port(port);
 		}	
 	} else if(port->wait_alert > 0){
 		port->wait_alert = 0;
+		port->is_suspicious = false;
+		free_alert_list(port->upper_ips);
 	} else {
 		if (learning_mode == DYNAMIC)
 			set_baselines(port);
