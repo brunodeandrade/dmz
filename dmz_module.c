@@ -117,6 +117,7 @@ int load_file(){
 
 	fclose(config_file);
 	init_cache();
+	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,package_threshold);
 	return 0;
 }
 
@@ -278,11 +279,13 @@ void print_ips_by_port(port_node * port){
 	}
 	int i = 0;
 	while(itr){
-		top_senders[i].upper_name = itr->upper_name;
-		top_senders[i].upper_ip = itr->upper_ip;
-		top_senders[i].packets = itr->packets;
+		if(itr->upper_name && itr->packets > 0){
+			top_senders[i].upper_name = itr->upper_name;
+			top_senders[i].upper_ip = itr->upper_ip;
+			top_senders[i].packets = itr->packets;
+			i++;
+		}
 		itr = itr->next;
-		i++;
 	}
 	
 
@@ -291,8 +294,10 @@ void print_ips_by_port(port_node * port){
 	i = 0;
 	for(i; i < number_of_upper_ips;i++) {
 		if(i < NUMBER_TOP_SENDERS) {
-			printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
-			top_senders[i].packets = 0;
+			if (top_senders[i].upper_name){
+				printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+				top_senders[i].packets = 0;
+			}
 		}
 		else {
 			break;
@@ -614,7 +619,7 @@ void * continuous_learning(){
 	while(true){
 		if(!is_adding) {
 			is_polling = true;
-			printf("\n POLL %d\n",i);
+			printf("POLL %d\n",i);
 			iterate_to_learn(ip_list);
 			//iterate_learnt(ip_list);
 			is_polling = false;
