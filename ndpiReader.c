@@ -314,7 +314,7 @@ static void parseOptions(int argc, char **argv) {
 
     case 'j':
 #ifndef HAVE_JSON_C
-      printf("WARNING: this copy of ndpiReader has been compiled without JSON-C: json export disabled\n");
+      //printf("WARNING: this copy of ndpiReader has been compiled without JSON-C: json export disabled\n");
 #else
       _jsonFilePath = optarg;
       json_flag = 1;
@@ -1819,7 +1819,7 @@ static void pcap_packet_callback(u_char *args,
       static u_int8_t cap_warning_used = 0;
 
       if(cap_warning_used == 0) {
-	if((!json_flag) && (!quiet_mode)) printf("\n\nWARNING: packet capture size is smaller than packet size, DETECTION MIGHT NOT WORK CORRECTLY\n\n");
+	if((!json_flag) && (!quiet_mode)) //printf("\n\nWARNING: packet capture size is smaller than packet size, DETECTION MIGHT NOT WORK CORRECTLY\n\n");
 	cap_warning_used = 1;
       }
     }
@@ -1839,7 +1839,7 @@ static void pcap_packet_callback(u_char *args,
       ndpi_thread_info[thread_id].stats.fragmented_count++;
 
       if(ipv4_frags_warning_used == 0) {
-	if((!json_flag) && (!quiet_mode)) printf("\n\nWARNING: IPv4 fragments are not handled by this demo (nDPI supports them)\n");
+	if((!json_flag) && (!quiet_mode)) //printf("\n\nWARNING: IPv4 fragments are not handled by this demo (nDPI supports them)\n");
 	ipv4_frags_warning_used = 1;
       }
 
@@ -1874,7 +1874,7 @@ static void pcap_packet_callback(u_char *args,
   v4_warning:
     if(ipv4_warning_used == 0) {
       if((!json_flag) && (!quiet_mode))
-	printf("\n\nWARNING: only IPv4/IPv6 packets are supported in this demo (nDPI supports both IPv4 and IPv6), all other packets will be discarded\n\n");
+	//printf("\n\nWARNING: only IPv4/IPv6 packets are supported in this demo (nDPI supports both IPv4 and IPv6), all other packets will be discarded\n\n");
       ipv4_warning_used = 1;
     }
     ndpi_thread_info[thread_id].stats.total_discarded_bytes +=  header->len;
@@ -1974,11 +1974,11 @@ void *processing_thread(void *_thread_id) {
     if(pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
       fprintf(stderr, "Error while binding thread %ld to core %d\n", thread_id, core_affinity[thread_id]);
     else {
-      if((!json_flag) && (!quiet_mode)) printf("Running thread %ld on core %d...\n", thread_id, core_affinity[thread_id]);
+      if((!json_flag) && (!quiet_mode)){} //printf("Running thread %ld on core %d...\n", thread_id, core_affinity[thread_id]);
     }
   } else
 #endif
-    if((!json_flag) && (!quiet_mode)) printf("Running thread %ld...\n", thread_id);
+    if((!json_flag) && (!quiet_mode)){} //printf("Running thread %ld...\n", thread_id);
 
  pcap_loop:
   runPcapLoop(thread_id);
@@ -2054,12 +2054,12 @@ int main(int argc, char **argv) {
   parseOptions(argc, argv);
 
   if((!json_flag) && (!quiet_mode)) {
-    printf("\n-----------------------------------------------------------\n"
-	   "* NOTE: This is demo app to show *some* nDPI features.\n"
-	   "* In this demo we have implemented only some basic features\n"
-	   "* just to show you what you can do with the library. Feel \n"
-	   "* free to extend it and send us the patches for inclusion\n"
-	   "------------------------------------------------------------\n\n");
+    // printf("\n-----------------------------------------------------------\n"
+	   // "* NOTE: This is demo app to show *some* nDPI features.\n"
+	   // "* In this demo we have implemented only some basic features\n"
+	   // "* just to show you what you can do with the library. Feel \n"
+	   // "* free to extend it and send us the patches for inclusion\n"
+	   // "------------------------------------------------------------\n\n");
 
     printf("Using nDPI (%s) [%d thread(s)]\n", ndpi_revision(), num_threads);
   }

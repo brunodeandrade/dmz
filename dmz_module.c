@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include <tgmath.h>
+#include "linked_list.c"
 
 #define POLL_TIME 10
 #define MAX_CACHE 1000000
@@ -21,12 +22,6 @@ typedef int bool;
 enum {false, true};
 enum {DYNAMIC, STATIC};
 
-typedef struct ip_alert{
-	int upper_ip;
-	char * upper_name;
-	int packets;
-	UT_hash_handle hh;
-} ip_alert;
 
 typedef struct port_node{
 	int port_name;
@@ -39,7 +34,7 @@ typedef struct port_node{
 	float new_baseline;//The result of the learning
 	float old_baseline;
 	struct timeval time_of_detection;
-	ip_alert *upper_ips;
+	ip_alert_list *upper_ips;
 	UT_hash_handle hh;
 }port_node;
 
@@ -80,6 +75,7 @@ int init_cache()        {
         memset(cache_sum, 0x0, MAX_CACHE);
         is_adding = 0;
         is_polling = 0;
+
 }
 
 long double poisson(int k, int lam)     {
@@ -162,7 +158,12 @@ port_node * create_port_node(int port_name, int current_packets){
 	}	
 
 	
-	node->upper_ips = NULL;
+	node->upper_ips = init_list(node->upper_ips);
+
+	if(!node->upper_ips) {
+		return NULL;
+	}
+
 	node->new_baseline = 0;
 	node->old_baseline = 0;
 	node->wait_alert = 0;
@@ -265,9 +266,9 @@ int cmpfunc (const void * a, const void * b) {
 void print_ips_by_port(port_node * port){
 	printf("\n\nALERT! PORT SUSPICIOUS: %d\n",ntohs(port->port_name));
 
-	ip_alert * itr = port->upper_ips, *next = NULL;
+	ip_alert * itr = port->upper_ips->head, *next = NULL;
 	ip_alert * top_senders = NULL;
-	unsigned int number_of_upper_ips = HASH_COUNT(itr);
+	unsigned int number_of_upper_ips = port->upper_ips->size;
 
 	top_senders = (ip_alert*)calloc(number_of_upper_ips,sizeof(ip_alert));
 
@@ -275,13 +276,13 @@ void print_ips_by_port(port_node * port){
 		printf("Couldn't allocate top_senders\n");
 		exit(-1);
 	}
-
 	int i = 0;
-	for(itr; itr!= NULL && i < number_of_upper_ips;itr=next,i++){
+	while(itr){
 		top_senders[i].upper_name = itr->upper_name;
 		top_senders[i].upper_ip = itr->upper_ip;
 		top_senders[i].packets = itr->packets;
-		next = itr->hh.next;
+		itr = itr->next;
+		i++;
 	}
 	
 
@@ -290,7 +291,8 @@ void print_ips_by_port(port_node * port){
 	i = 0;
 	for(i; i < number_of_upper_ips;i++) {
 		if(i < NUMBER_TOP_SENDERS) {
-			printf("\t %d - IP: %s\n",i+1,top_senders[i].upper_name);
+			printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+			top_senders[i].packets = 0;
 		}
 		else {
 			break;
@@ -303,20 +305,17 @@ void find_upper_ip_and_increment (port_node *port, int upper_ip, char *upper_nam
 
 	ip_alert *findable_upper = NULL;
 
-	HASH_FIND_INT(port->upper_ips, &upper_ip, findable_upper);
+	findable_upper = find_node(port->upper_ips,upper_ip);
+
 	if(findable_upper) {
 		findable_upper->packets += current_packets;
 	}
 	else {
-		findable_upper = (ip_alert *)calloc(1,sizeof(ip_alert));
-		if(!findable_upper){
-			printf("Could not allocate alert!\n");
+		findable_upper = create_ip_alert_node(upper_ip,upper_name,current_packets);
+		if(!findable_upper)
 			return;		
-		}
-		findable_upper->upper_ip = upper_ip;
-		findable_upper->upper_name = upper_name;
-		findable_upper->packets = current_packets;
-		HASH_ADD_INT(port->upper_ips,upper_ip,findable_upper);
+
+		push_back(port->upper_ips,findable_upper);
 
 	}
 
@@ -410,19 +409,6 @@ void free_hash_list(ip_node * hash_list){
 }
 
 /*
-* Free Hash List
-*/
-void free_alert_list(ip_alert * hash_list){
-	ip_alert * current_alert, * tmp_alert;
-	
-	HASH_ITER(hh, hash_list, current_alert, tmp_alert){
-		HASH_DEL(hash_list,current_alert);
-		//free(itr);		
-	}
-	hash_list = NULL;
-}
-
-/*
 * Print Hash
 */
 void print_hash(){
@@ -481,12 +467,12 @@ void set_baselines(port_node * port_node){
 
 void verify_poisson(port_node *itr_port) {
 
-	printf("current packets: %d\n", itr_port->current_packets);
+	//printf("current packets: %d\n", itr_port->current_packets);
 	if(itr_port->current_packets == 0)
 		itr_port->current_packets = 1;
 
 	itr_port->poisson_result = 1 - (1 + 1/poisson(itr_port->current_packets, itr_port->new_baseline));
-	printf("poisson %Lf\n", itr_port->poisson_result);
+	//printf("poisson %Lf\n", itr_port->poisson_result);
 	if(itr_port->poisson_result > global_threshold) {
 		itr_port->wait_alert++;
 		itr_port->is_suspicious = true;
@@ -496,7 +482,7 @@ void verify_poisson(port_node *itr_port) {
 	}else if(itr_port->wait_alert > 0){
 		itr_port->wait_alert = 0;
 		itr_port->is_suspicious = false;
-		free_alert_list(itr_port->upper_ips);
+		delete_all(itr_port->upper_ips);
 	}
 	itr_port->current_packets = 0;
 }
@@ -516,7 +502,7 @@ void verify_baseline(port_node *port){
 	} else if(port->wait_alert > 0){
 		port->wait_alert = 0;
 		port->is_suspicious = false;
-		free_alert_list(port->upper_ips);
+		delete_all(port->upper_ips);
 	} else {
 		if (learning_mode == DYNAMIC)
 			set_baselines(port);
@@ -632,7 +618,7 @@ void * continuous_learning(){
 			iterate_to_learn(ip_list);
 			//iterate_learnt(ip_list);
 			is_polling = false;
-			printf("Sleeping...\n");
+			//printf("Sleeping...\n");
 			sleep(POLL_TIME);
 			i++;
 		}
