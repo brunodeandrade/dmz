@@ -1587,7 +1587,7 @@ static void openPcapFileOrDevice(u_int16_t thread_id) {
   } else {
     live_capture = 1;
 
-    if((!json_flag) && (!quiet_mode)) printf("Capturing live traffic from device %s...\n", _pcap_file[thread_id]);
+    //if((!json_flag) && (!quiet_mode)) printf("Capturing live traffic from device %s...\n", _pcap_file[thread_id]);
   }
 
   configurePcapHandle(thread_id);
@@ -2061,13 +2061,12 @@ int main(int argc, char **argv) {
 	   // "* free to extend it and send us the patches for inclusion\n"
 	   // "------------------------------------------------------------\n\n");
 
-    printf("Using nDPI (%s) [%d thread(s)]\n", ndpi_revision(), num_threads);
+    //printf("Using nDPI (%s) [%d thread(s)]\n", ndpi_revision(), num_threads);
   }
 
   signal(SIGINT, sigproc);
   for(i=0; i<num_loops; i++)
     test_lib();
-
 
   if(results_path) free(results_path);
   if(results_file) fclose(results_file);

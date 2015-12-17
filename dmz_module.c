@@ -111,20 +111,26 @@ int load_file(){
 		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
-		printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
+		printf ("ERRO! Parâmetros inválidos. Por favor verifique se R0 + R1 < 1.\n");
+	//	printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
 		exit (-1);
 	}
 
 	fclose(config_file);
 	init_cache();
-	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,package_threshold);
+	printf ("\nArquivo de configuração lido com sucesso. Parâmetros do sistema:\n");
+	printf("\nTempo para aprendizado: %d segundos cada poll\n", POLL_TIME);
+	printf("Tempo total de aprendizado: %d polls\n", learning_time_sys);
+	printf("Tempo de espera (WAIT_ALERT): %d polls\n", wait_alert_sys);
+	printf("Limiar de detecção: %dx\n\n", package_threshold);
+	//printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,package_threshold);
 	return 0;
 }
 
 
 void print_info(long ip_number, char *ip_name, u_short protocol, int lower_port, int packets){
 
-	printf("Upper number: %ld, Upper name: %s  protocol: %d port: %i  packets: %d \n\n", ip_number, ip_name, protocol,lower_port,packets);
+	//printf("Upper number: %ld, Upper name: %s  protocol: %d port: %i  packets: %d \n\n", ip_number, ip_name, protocol,lower_port,packets);
 
 }
 
@@ -246,7 +252,7 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 		HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
 		break;
 	default: 
-		printf("not known protocol\n");
+		//printf("not known protocol\n");
 		break;
 	}
 	return findable_port;
@@ -265,7 +271,8 @@ int cmpfunc (const void * a, const void * b) {
 * Find ip's for a given PORT
 */
 void print_ips_by_port(port_node * port){
-	printf("\n\nALERT! PORT SUSPICIOUS: %d\n",ntohs(port->port_name));
+	//printf("\n\nALERT! PORT SUSPICIOUS: %d\n",ntohs(port->port_name));
+	printf("ALERTA! PORTA SUSPEITA: %d\n",ntohs(port->port_name));
 
 	ip_alert * itr = port->upper_ips->head, *next = NULL;
 	ip_alert * top_senders = NULL;
@@ -295,7 +302,9 @@ void print_ips_by_port(port_node * port){
 	for(i; i < number_of_upper_ips;i++) {
 		if(i < NUMBER_TOP_SENDERS) {
 			if (top_senders[i].upper_name){
-				printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+				//printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+				printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+
 				top_senders[i].packets = 0;
 			}
 		}
@@ -496,10 +505,10 @@ void verify_poisson(port_node *itr_port) {
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
-		printf("Is suspicious\n");
+		//printf("Fluxo suspeito!\n");
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
 			print_ips_by_port(port);
@@ -588,21 +597,21 @@ void iterate_learnt(ip_node *itr) {
 
 	ip_node * next = NULL;
 	port_node * itr_port = NULL, *next_port = NULL;
-	printf("\nIteration learnt:\n");
+	//printf("\nIteration learnt:\n");
 		for(; itr!= NULL;itr=next){
 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-				printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+				//printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
 
 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-				printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+				//printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
 			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-				printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+				//printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
 				verify_poisson(itr_port);
 				next_port = itr_port->hh.next;			
 			}
@@ -619,7 +628,9 @@ void * continuous_learning(){
 	while(true){
 		if(!is_adding) {
 			is_polling = true;
+			printf("--------------------------\n");
 			printf("POLL %d\n",i);
+			printf("--------------------------\n");
 			iterate_to_learn(ip_list);
 			//iterate_learnt(ip_list);
 			is_polling = false;
