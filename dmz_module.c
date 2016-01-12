@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "uthash.h"
+#include <glib.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <math.h>
@@ -35,20 +35,18 @@ typedef struct port_node{
 	float old_baseline;
 	struct timeval time_of_detection;
 	ip_alert_list *upper_ips;
-	UT_hash_handle hh;
 }port_node;
 
 typedef struct ip_node{	
 	int lower_ip;//primary key
 	char * ip_name;
-	port_node * tcp_ports;
-	port_node * udp_ports;
-	port_node * icmp_ports;// It's a code not a port
-	UT_hash_handle hh;
+	GHashTable * tcp_ports;
+	GHashTable * udp_ports;
+	GHashTable * icmp_ports;// It's a code not a port
 } ip_node;
 
 
-ip_node * ip_list = NULL;
+GHashTable * ip_list;
 //ip_node * to_learn_list = NULL;
 //ip_node * learnt_list = NULL;
 
@@ -64,17 +62,20 @@ int verify_config; // should tell which verify technique the system is using (0 
 int learning_mode;
 
 bool is_adding, is_polling;
-
+int ip_number;
 
 int init_cache()        {
-        int i=1;
 
-        for(; i<MAX_CACHE; i++)
-                cache_log[i] = logl((long double)i);
+	ip_list = g_hash_table_new (g_int_hash,g_direct_equal);
 
-        memset(cache_sum, 0x0, MAX_CACHE);
-        is_adding = 0;
-        is_polling = 0;
+    int i=1;
+
+    for(; i<MAX_CACHE; i++)
+        cache_log[i] = logl((long double)i);
+
+    memset(cache_sum, 0x0, MAX_CACHE);
+    is_adding = 0;
+    is_polling = 0;
 
 }
 
@@ -146,9 +147,9 @@ ip_node * create_ip_node(char * ip_name, int lower_ip){
 	}	
 	node->ip_name = ip_name;
 	node->lower_ip = lower_ip;
-	node->tcp_ports = NULL;
-	node->udp_ports = NULL;
-	node->icmp_ports = NULL;
+	node->tcp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
+	node->udp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
+	node->icmp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
 	return node;
 }
 
@@ -193,13 +194,13 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 	
 	switch(protocol_id){
 		case IPPROTO_TCP:
-			HASH_DEL(ip->tcp_ports, port);
+			g_hash_table_remove(ip->tcp_ports, &port_name);
 			break;
 		case IPPROTO_UDP:
-			HASH_DEL(ip->udp_ports, port);
+			g_hash_table_remove(ip->udp_ports, &port_name);
 			break;
 		case IPPROTO_ICMP:
-			HASH_DEL(ip->icmp_ports, port);
+			g_hash_table_remove(ip->icmp_ports, &port_name);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -218,13 +219,16 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 
 	switch(protocol_id){
 		case IPPROTO_TCP:
-			HASH_ADD_INT(ip_node->tcp_ports, port_name, port);
+			/*Chave e valor*/
+			g_hash_table_insert(ip_node->tcp_ports,&port_name,port);
 			break;
 		case IPPROTO_UDP:
-			HASH_ADD_INT(ip_node->udp_ports, port_name, port);
+			/*Chave e valor*/
+			g_hash_table_insert(ip_node->udp_ports,&port_name,port);
 			break;
 		case IPPROTO_ICMP:
-			HASH_ADD_INT(ip_node->icmp_ports, port_name, port);
+			/*Chave e valor*/
+			g_hash_table_insert(ip_node->icmp_ports,&port_name,port);			
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -243,13 +247,13 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 
 	switch(protocol_id){
 	case IPPROTO_TCP:
-		HASH_FIND_INT(ip_node->tcp_ports, &(port_name), findable_port);
+		findable_port = g_hash_table_lookup(ip_node->tcp_ports,&port_name);
 		break;
 	case IPPROTO_UDP:
-		HASH_FIND_INT(ip_node->udp_ports, &(port_name), findable_port);
+		findable_port = g_hash_table_lookup(ip_node->udp_ports,&port_name);
 		break;
 	case IPPROTO_ICMP:
-		HASH_FIND_INT(ip_node->icmp_ports, &(port_name), findable_port);
+		findable_port = g_hash_table_lookup(ip_node->icmp_ports,&port_name);
 		break;
 	default: 
 		//printf("not known protocol\n");
@@ -370,56 +374,77 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 	if(!is_polling) {
 		is_adding = true;
 
-		ip_node * findable = NULL;
+		ip_node * findable_ip = NULL;
 
-		HASH_FIND_INT(ip_list,&lower_ip,findable);
+		findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
 
 		
-		if(findable){		
-			find_port_and_increment(findable,protocol_id, port_name, current_packets,upper_ip,upper_name);
+		if(findable_ip){		
+			find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
 		}else{
 			port_node * port = create_port_node(port_name, current_packets);
 			ip_node * ip = create_ip_node(lower_name,lower_ip);
 			insert_port_in_hash(ip,protocol_id,port);
-			HASH_ADD_INT(ip_list, lower_ip, ip);
+			g_hash_table_insert(ip_list,&lower_ip,ip);
 		}	
 		is_adding = false;
 	}
 }
 
 
+static gboolean free_value(gpointer key, gpointer value, gpointer user_data) {
+
+	g_free(value);
+	g_free(key);
+
+	return true;
+}
+
+static gboolean iterator_and_delete_ips(gpointer key, gpointer value, gpointer user_data) {
+	ip_node *ip = (ip_node *) value;
+
+	g_hash_table_foreach_remove(ip->tcp_ports,free_value,NULL); 
+	g_hash_table_foreach_remove(ip->udp_ports,free_value,NULL); 
+	g_hash_table_foreach_remove(ip->icmp_ports,free_value,NULL);
+
+	free(ip);
+}
+
+
+
 /*
 * Free Hash List
 */
-void free_hash_list(ip_node * hash_list){
+void free_hash_list(GHashTable * hash_list){
 	ip_node * itr = NULL,* next = NULL;
 	port_node * itr_port = NULL, *next_port = NULL;
 	int i = 0;
+ 
+
+	g_hash_table_foreach_remove(hash_list,iterator_and_delete_ips,NULL); 
 	
-	for(itr = hash_list; itr!= NULL;itr=next){
+}
 
-		for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-			next_port = itr_port->hh.next;
-			HASH_DEL(itr->tcp_ports,itr_port);
-			free(itr_port);
-		}
 
-		for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-			next_port = itr_port->hh.next;
-			HASH_DEL(itr->udp_ports,itr_port);
-			free(itr_port);
-		}
-		for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-			next_port = itr_port->hh.next;
-			HASH_DEL(itr->icmp_ports,itr_port);
-			free(itr_port);
-		}
-		
+void iterate_and_print_ports(gpointer key, gpointer value, gpointer user_data) {
+	port_node *port = (port_node *)value;
 
-		next = itr->hh.next;
-		HASH_DEL(hash_list,itr);
-		free(itr);		
-	}
+	printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",port->port_name,port->current_packets,port->new_baseline,port->time_of_detection);
+ 	//printf(user_data, *(gint*)key, value);
+}
+
+void iterate_and_print_ips(gpointer key, gpointer value, gpointer user_data) {
+	ip_node *ip = (ip_node *) value;
+
+	printf("\t%d - IP: %s\n",ip_number++,ip->ip_name);
+	printf("         TCP\n");
+	g_hash_table_foreach(ip->tcp_ports, (GHFunc)iterate_and_print_ports, NULL);
+
+	printf("         UDP\n");
+	g_hash_table_foreach(ip->udp_ports, (GHFunc)iterate_and_print_ports, NULL);
+	printf("         ICMP\n");
+	g_hash_table_foreach(ip->icmp_ports, (GHFunc)iterate_and_print_ports, NULL);
+ 	//printf(user_data, *(gint*)key, value);
 }
 
 /*
@@ -428,21 +453,12 @@ void free_hash_list(ip_node * hash_list){
 void print_hash(){
 	ip_node * itr;
 	port_node *irt_port;
-	int i = 0;
+	int ip_number = 0;
 
 	printf("\n\tHash:\n");
-	for(itr = ip_list; itr!= NULL;itr= itr->hh.next){
-		printf("\t%d - IP: %s\n",i++,itr->ip_name);
-		printf("         TCP\n");
-		for(irt_port = itr->tcp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",irt_port->port_name,irt_port->current_packets,irt_port->new_baseline,irt_port->time_of_detection);
-		printf("         UDP\n");
-		for(irt_port = itr->udp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %f\n",irt_port->port_name, irt_port->new_baseline, irt_port->current_packets);
-		printf("         ICMP\n");
-		for(irt_port = itr->icmp_ports; irt_port != NULL; irt_port = irt_port->hh.next)
-			printf("           Port: %d, Current Packets: %d, Baseline: %f\n",irt_port->port_name,irt_port->new_baseline,irt_port->current_packets);
-	}
+
+	g_hash_table_foreach(ip_list, (GHFunc)iterate_and_print_ips, NULL);
+
 
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
 	free_hash_list(ip_list);
@@ -505,10 +521,10 @@ void verify_poisson(port_node *itr_port) {
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
-		//printf("Fluxo suspeito!\n");
+		printf("Fluxo suspeito!\n");
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
 			print_ips_by_port(port);
@@ -540,85 +556,68 @@ void verify_flow(port_node *port){
 	}
 }
 
+void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
+
+	port_node *itr_port = (port_node *) value;
+
+	if(itr_port->learnt){
+		verify_flow(itr_port);
+	}else{
+		if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
+			set_baselines(itr_port);
+		}else{
+			itr_port->learnt = true;
+		}
+	}
+}
+
+void iterator_ips(gpointer key, gpointer value, gpointer user_data) {
+	ip_node *ip = (ip_node *) value;
+
+	g_hash_table_foreach(ip->tcp_ports, (GHFunc)iterator_ports, NULL);
+	g_hash_table_foreach(ip->udp_ports, (GHFunc)iterator_ports, NULL);
+	g_hash_table_foreach(ip->icmp_ports, (GHFunc)iterator_ports, NULL);
+}
+
 
 /*
 * Iterate over the ip_list and check if the port has learned.
 */
-void iterate_to_learn(ip_node *itr) {
+void iterate_to_learn() {
 
 	ip_node * next = NULL;
 	port_node * itr_port = NULL, *next_port = NULL;
-		for(; itr!= NULL;itr=next){
-			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-				//printf("port_tcp: %d\n", itr_port->port_name);
-				if(itr_port->learnt){
-					verify_flow(itr_port);
-				}else{
-					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-						set_baselines(itr_port);
-					}else{
-						itr_port->learnt = true;
-					}
-				}
-				next_port = itr_port->hh.next;			
-			}
-
-			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-				//printf("port_udp: %d\n", itr_port->port_name);
-				if(itr_port->learnt){
-					verify_flow(itr_port);
-				}else{
-					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-						set_baselines(itr_port);
-					}else{
-						itr_port->learnt = true;
-					}
-				}
-				next_port = itr_port->hh.next;			
-			}
-			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-				if(itr_port->learnt){
-					verify_flow(itr_port);
-				}else{
-					if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
-						set_baselines(itr_port);
-					}else{
-						itr_port->learnt = true;
-					}
-				}
-				next_port = itr_port->hh.next;			
-			}
-
-			next = itr->hh.next;
-		}
+	g_hash_table_foreach(ip_list, (GHFunc)iterator_ips, NULL);
 }
 
-void iterate_learnt(ip_node *itr) {
 
-	ip_node * next = NULL;
-	port_node * itr_port = NULL, *next_port = NULL;
-	//printf("\nIteration learnt:\n");
-		for(; itr!= NULL;itr=next){
-			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-				//printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-				verify_poisson(itr_port);
-				next_port = itr_port->hh.next;			
-			}
+//TODO - Update to Glib hash
+// void iterate_learnt(ip_node *itr) {
 
-			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-				//printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-				verify_poisson(itr_port);
-				next_port = itr_port->hh.next;			
-			}
-			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-				//printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-				verify_poisson(itr_port);
-				next_port = itr_port->hh.next;			
-			}
+// 	ip_node * next = NULL;
+// 	port_node * itr_port = NULL, *next_port = NULL;
+// 	//printf("\nIteration learnt:\n");
+// 		for(; itr!= NULL;itr=next){
+// 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
+// 				//printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+// 				verify_poisson(itr_port);
+// 				next_port = itr_port->hh.next;			
+// 			}
 
-			next = itr->hh.next;
-		}
-}
+// 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
+// 				//printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+// 				verify_poisson(itr_port);
+// 				next_port = itr_port->hh.next;			
+// 			}
+// 			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
+// 				//printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
+// 				verify_poisson(itr_port);
+// 				next_port = itr_port->hh.next;			
+// 			}
+
+// 			next = itr->hh.next;
+// 		}
+// }
 
 /*
 * Learning Control - Poll Iteration
@@ -631,7 +630,7 @@ void * continuous_learning(){
 			printf("--------------------------\n");
 			printf("POLL %d\n",i);
 			printf("--------------------------\n");
-			iterate_to_learn(ip_list);
+			iterate_to_learn();
 			//iterate_learnt(ip_list);
 			is_polling = false;
 			//printf("Sleeping...\n");

@@ -174,7 +174,7 @@ AUTOMAKE = ${SHELL} /opt/nDPI/missing automake-1.14
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
-CFLAGS = -g -O2 -lm
+CFLAGS = -g  -lm -I/usr/local/include/glib-2.0 -I/usr/local/lib/glib-2.0/include -L/usr/local/lib -lglib-2.0
 CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
