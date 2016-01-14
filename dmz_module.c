@@ -63,10 +63,31 @@ int learning_mode;
 
 bool is_adding, is_polling;
 int ip_number;
+int ports[66000];
+
+void iterator_port(gpointer key, gpointer value, gpointer user_data) {
+	int chave = *(int *)key;
+	port_node *port = (port_node *) value;
+
+	printf("\t Chave: %d, Port: %d\n",chave, port->port_name);
+}
+
+
+
+void iterator(gpointer key, gpointer value, gpointer user_data) {
+	int chave = *(int *)key;
+	ip_node *ip = (ip_node *) value;
+
+	printf("IP: %s  Ports:\n", ip->ip_name);
+	g_hash_table_foreach(ip->udp_ports, (GHFunc)iterator_port, NULL);
+ 	//printf(user_data, *(gint*)key, value);
+}
+
+
 
 int init_cache()        {
 
-	ip_list = g_hash_table_new (g_int_hash,g_direct_equal);
+	ip_list = g_hash_table_new (g_direct_hash,g_int_equal);
 
     int i=1;
 
@@ -74,6 +95,8 @@ int init_cache()        {
         cache_log[i] = logl((long double)i);
 
     memset(cache_sum, 0x0, MAX_CACHE);
+
+	for(i=0; i<66000; i++) ports[i] = 0;
     is_adding = 0;
     is_polling = 0;
 
@@ -147,9 +170,9 @@ ip_node * create_ip_node(char * ip_name, int lower_ip){
 	}	
 	node->ip_name = ip_name;
 	node->lower_ip = lower_ip;
-	node->tcp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
-	node->udp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
-	node->icmp_ports = g_hash_table_new (g_int_hash,g_direct_equal);
+	node->tcp_ports = g_hash_table_new (g_direct_hash,g_int_equal);
+	node->udp_ports = g_hash_table_new (g_direct_hash,g_int_equal);
+	node->icmp_ports = g_hash_table_new(g_direct_hash,g_int_equal);
 	return node;
 }
 
@@ -190,17 +213,19 @@ port_node * create_port_node(int port_name, int current_packets){
 */
 void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 
-	int port_name = port->port_name;
+	// int *port_name = (int *)calloc(1,sizeof(int *));
+	
+	// *port_name = port->port_name;
 	
 	switch(protocol_id){
 		case IPPROTO_TCP:
-			g_hash_table_remove(ip->tcp_ports, &port_name);
+			g_hash_table_remove(ip->tcp_ports, &ports[port->port_name]);
 			break;
 		case IPPROTO_UDP:
-			g_hash_table_remove(ip->udp_ports, &port_name);
+			g_hash_table_remove(ip->udp_ports, &ports[port->port_name]);
 			break;
 		case IPPROTO_ICMP:
-			g_hash_table_remove(ip->icmp_ports, &port_name);
+			g_hash_table_remove(ip->icmp_ports, &ports[port->port_name]);
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -213,22 +238,23 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 *Inserts a new port in the hash of the node
 *
 */
-void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *port) {
+void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *port,int port_name) {
 
-	int port_name = port->port_name;
-
+	ports[port_name] = port_name;
 	switch(protocol_id){
-		case IPPROTO_TCP:
-			/*Chave e valor*/
-			g_hash_table_insert(ip_node->tcp_ports,&port_name,port);
+		case IPPROTO_TCP:	
+			/*Hash, Chave e valor*/
+			g_hash_table_insert(ip_node->tcp_ports,&ports[port_name],port);
+			
 			break;
 		case IPPROTO_UDP:
 			/*Chave e valor*/
-			g_hash_table_insert(ip_node->udp_ports,&port_name,port);
+			g_hash_table_insert(ip_node->udp_ports,&ports[port_name],port);
+			
 			break;
 		case IPPROTO_ICMP:
 			/*Chave e valor*/
-			g_hash_table_insert(ip_node->icmp_ports,&port_name,port);			
+			g_hash_table_insert(ip_node->icmp_ports,&ports[port_name],port);			
 			break;
 		default: 
 			printf("not known protocol\n");
@@ -241,24 +267,32 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 * Search port in a hash.
 */
 
+//O BUG ESTA AQUI!!!!!!!!!!!!!
 port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 
 	port_node * findable_port = NULL;
 
+
 	switch(protocol_id){
 	case IPPROTO_TCP:
-		findable_port = g_hash_table_lookup(ip_node->tcp_ports,&port_name);
+		findable_port = g_hash_table_lookup(ip_node->tcp_ports,&ports[port_name]);
 		break;
 	case IPPROTO_UDP:
-		findable_port = g_hash_table_lookup(ip_node->udp_ports,&port_name);
+		//g_hash_table_foreach(ip_node->udp_ports, (GHFunc)iterator_port, NULL);
+
+		findable_port = g_hash_table_lookup(ip_node->udp_ports,&ports[port_name]);
+		// printf("port name pointer: %d\n", *port_name_pointer);
+		// if(findable_port) printf("Achou findable_port\n");
 		break;
 	case IPPROTO_ICMP:
-		findable_port = g_hash_table_lookup(ip_node->icmp_ports,&port_name);
+		findable_port = g_hash_table_lookup(ip_node->icmp_ports,&ports[port_name]);
 		break;
 	default: 
 		//printf("not known protocol\n");
 		break;
 	}
+
+
 	return findable_port;
 }
 
@@ -349,6 +383,7 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 	port_node * findable_port = find_port(ip_node, protocol_id, port_name);
 
 	if(findable_port) {
+		// printf("Current packets in pool: %d\n",findable_port->current_packets);
 		findable_port->current_packets += current_packets;
 		if(findable_port->is_suspicious){
 			find_upper_ip_and_increment(findable_port,upper_ip,upper_name,current_packets);
@@ -357,13 +392,18 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 	}
 
 	else {
+		// printf("Not found port %d. Current packets: %d\n",ntohs(port_name),current_packets);
 		port_node * port = create_port_node(port_name, current_packets);
 		if(port)
-			insert_port_in_hash(ip_node, protocol_id, port);
+			insert_port_in_hash(ip_node, protocol_id, port,port_name);
 		else
 			printf("Not allocated.\n");
 	}
 }
+
+
+
+
 
 /*
 * Adds an IP node to the hash list
@@ -378,13 +418,16 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 
 		findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
 
+		// printf("Vai iterar...\n");
+		// g_hash_table_foreach(ip_list, (GHFunc)iterator, NULL);
+		// printf("Iterou.\n");
 		
 		if(findable_ip){		
 			find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
 		}else{
 			port_node * port = create_port_node(port_name, current_packets);
 			ip_node * ip = create_ip_node(lower_name,lower_ip);
-			insert_port_in_hash(ip,protocol_id,port);
+			insert_port_in_hash(ip,protocol_id,port,port_name);
 			g_hash_table_insert(ip_list,&lower_ip,ip);
 		}	
 		is_adding = false;
@@ -395,7 +438,7 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 static gboolean free_value(gpointer key, gpointer value, gpointer user_data) {
 
 	g_free(value);
-	g_free(key);
+	//g_free(key);
 
 	return true;
 }
@@ -429,7 +472,7 @@ void free_hash_list(GHashTable * hash_list){
 void iterate_and_print_ports(gpointer key, gpointer value, gpointer user_data) {
 	port_node *port = (port_node *)value;
 
-	printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",port->port_name,port->current_packets,port->new_baseline,port->time_of_detection);
+	printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",ntohs(port->port_name),port->current_packets,port->new_baseline,port->time_of_detection);
  	//printf(user_data, *(gint*)key, value);
 }
 
