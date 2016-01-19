@@ -10,7 +10,7 @@
 
 #define POLL_TIME 10
 #define MAX_CACHE 1000000
-#define NUMBER_TOP_SENDERS 10
+#define NUMBER_TOP_SENDERS INT_MAX
 
 long double cache_log[MAX_CACHE];
 long double cache_sum[MAX_CACHE];
@@ -337,6 +337,7 @@ void print_ips_by_port(port_node * port){
 	qsort(top_senders,number_of_upper_ips,sizeof(ip_alert),cmpfunc);
 
 	i = 0;
+
 	for(i; i < number_of_upper_ips;i++) {
 		if(i < NUMBER_TOP_SENDERS) {
 			if (top_senders[i].upper_name){
@@ -555,8 +556,9 @@ void verify_poisson(port_node *itr_port) {
 	}else if(itr_port->wait_alert > 0){
 		itr_port->wait_alert = 0;
 		itr_port->is_suspicious = false;
-		delete_all(itr_port->upper_ips);
+		
 	}
+	delete_all(itr_port->upper_ips);
 	itr_port->current_packets = 0;
 }
 
@@ -564,7 +566,7 @@ void verify_poisson(port_node *itr_port) {
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 		printf("Fluxo suspeito!\n");
@@ -575,11 +577,12 @@ void verify_baseline(port_node *port){
 	} else if(port->wait_alert > 0){
 		port->wait_alert = 0;
 		port->is_suspicious = false;
-		delete_all(port->upper_ips);
+		
 	} else {
 		if (learning_mode == DYNAMIC)
 			set_baselines(port);
 	}
+	delete_all(port->upper_ips);
 	port->current_packets = 0;
 }
 
