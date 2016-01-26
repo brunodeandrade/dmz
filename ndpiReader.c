@@ -42,18 +42,15 @@
 #include <pcap.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sys/socket.h>
+#include <dmz_module.c>
 
 #include "../config.h"
+#include "ndpi_api.h"
 
 #ifdef HAVE_JSON_C
 #include <json.h>
 #endif
-
-#include "ndpi_api.h"
-
-#include <sys/socket.h>
-
-#include <dmz_module.c>
 
 #define MAX_NUM_READER_THREADS     16
 #define IDLE_SCAN_PERIOD           10 /* msec (use detection_tick_resolution = 1000) */
@@ -79,6 +76,7 @@
 #define MPLS_UNI               0x8847
 #define MPLS_MULTI             0x8848
 #define PPPoE                  0x8864
+#define SNAP                   0xaa
 
 /* mask for FCF */
 #define	WIFI_DATA                        0x2    /* 0000 0010 */
@@ -192,9 +190,8 @@ typedef struct ndpi_flow {
   u_int16_t vlan_id;
   struct ndpi_flow_struct *ndpi_flow;
   char lower_name[48], upper_name[48];
-
+  u_int8_t ip_version;
   u_int64_t last_seen;
-
   u_int64_t bytes;
   u_int32_t packets;
 
@@ -314,7 +311,7 @@ static void parseOptions(int argc, char **argv) {
 
     case 'j':
 #ifndef HAVE_JSON_C
-      //printf("WARNING: this copy of ndpiReader has been compiled without JSON-C: json export disabled\n");
+      printf("WARNING: this copy of ndpiReader has been compiled without JSON-C: json export disabled\n");
 #else
       _jsonFilePath = optarg;
       json_flag = 1;
@@ -411,7 +408,7 @@ static void debug_printf(u_int32_t protocol, void *id_struct,
 
 /* ***************************************************** */
 
-static void *malloc_wrapper(unsigned long size) {
+static void *malloc_wrapper(size_t size) {
   current_ndpi_memory += size;
 
   if(current_ndpi_memory > max_ndpi_memory)
@@ -499,19 +496,18 @@ static void printFlow(u_int16_t thread_id, struct ndpi_flow *flow) {
   FILE *out = results_file ? results_file : stdout;
 
   if(!json_flag) {
-#if 0
-    fprintf(out, "\t%s [VLAN: %u] %s:%u <-> %s:%u\n",
-	    ipProto2Name(flow->protocol), flow->vlan_id,
-	    flow->lower_name, ntohs(flow->lower_port),
-	    flow->upper_name, ntohs(flow->upper_port));
-
-#else
     fprintf(out, "\t%u", ++num_flows);
 
-    fprintf(out, "\t%s %s:%u <-> %s:%u ",
+    fprintf(out, "\t%s %s%s%s:%u <-> %s%s%s:%u ",
 	    ipProto2Name(flow->protocol),
-	    flow->lower_name, ntohs(flow->lower_port),
-	    flow->upper_name, ntohs(flow->upper_port));
+	    (flow->ip_version == 6) ? "[" : "",
+	    flow->lower_name, 
+	    (flow->ip_version == 6) ? "]" : "",
+	    ntohs(flow->lower_port),
+	    (flow->ip_version == 6) ? "[" : "",
+	    flow->upper_name, 
+	    (flow->ip_version == 6) ? "]" : "",
+	    ntohs(flow->upper_port));
 
     if(flow->vlan_id > 0) fprintf(out, "[VLAN: %u]", flow->vlan_id);
 
@@ -535,7 +531,6 @@ static void printFlow(u_int16_t thread_id, struct ndpi_flow *flow) {
     if(flow->ssl.server_certificate[0] != '\0') fprintf(out, "[SSL server: %s]", flow->ssl.server_certificate);
 
     fprintf(out, "\n");
-#endif
   } else {
 #ifdef HAVE_JSON_C
     jObj = json_object_new_object();
@@ -656,16 +651,6 @@ static void node_proto_guess_walker(const void *node, ndpi_VISIT which, int dept
   struct ndpi_flow *flow = *(struct ndpi_flow **) node;
   u_int16_t thread_id = *((u_int16_t *) user_data);
 
-#if 0
-  printf("<%d>Walk on node %s (%p)\n",
-	 depth,
-	 which == preorder?"preorder":
-	 which == postorder?"postorder":
-	 which == endorder?"endorder":
-	 which == leaf?"leaf": "unknown",
-	 flow);
-#endif
-
   if((which == ndpi_preorder) || (which == ndpi_leaf)) { /* Avoid walking the same node multiple times */
     if(enable_protocol_guess) {
       if(flow->detected_protocol.protocol == NDPI_PROTOCOL_UNKNOWN) {
@@ -729,7 +714,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
 				       const u_int8_t version,
 				       u_int16_t vlan_id,
 				       const struct ndpi_iphdr *iph,
-				       const struct ndpi_ip6_hdr *iph6,
+				       const struct ndpi_ipv6hdr *iph6,
 				       u_int16_t ip_offset,
 				       u_int16_t ipsize,
 				       u_int16_t l4_packet_len,
@@ -766,7 +751,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
     l4_offset = iph->ihl * 4;
     l3 = (u_int8_t*)iph;
   } else {
-    l4_offset = sizeof(struct ndpi_ip6_hdr);
+    l4_offset = sizeof(struct ndpi_ipv6hdr);
     l3 = (u_int8_t*)iph6;
   }
 
@@ -888,6 +873,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
       newflow->protocol = iph->protocol, newflow->vlan_id = vlan_id;
       newflow->lower_ip = lower_ip, newflow->upper_ip = upper_ip;
       newflow->lower_port = lower_port, newflow->upper_port = upper_port;
+      newflow->ip_version = version;
 
       if(version == 4) {
 	inet_ntop(AF_INET, &lower_ip, newflow->lower_name, sizeof(newflow->lower_name));
@@ -943,7 +929,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
 
 static struct ndpi_flow *get_ndpi_flow6(u_int16_t thread_id,
 					u_int16_t vlan_id,
-					const struct ndpi_ip6_hdr *iph6,
+					const struct ndpi_ipv6hdr *iph6,
 					u_int16_t ip_offset,
 					struct ndpi_tcphdr **tcph,
 					struct ndpi_udphdr **udph,
@@ -963,13 +949,13 @@ static struct ndpi_flow *get_ndpi_flow6(u_int16_t thread_id,
   iph.protocol = iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
 
   if(iph.protocol == 0x3C /* IPv6 destination option */) {
-    u_int8_t *options = (u_int8_t*)iph6 + sizeof(const struct ndpi_ip6_hdr);
+    u_int8_t *options = (u_int8_t*)iph6 + sizeof(const struct ndpi_ipv6hdr);
 
     iph.protocol = options[0];
   }
 
   return(get_ndpi_flow(thread_id, 6, vlan_id, &iph, iph6, ip_offset,
-		       sizeof(struct ndpi_ip6_hdr),
+		       sizeof(struct ndpi_ipv6hdr),
 		       ntohs(iph6->ip6_ctlun.ip6_un1.ip6_un1_plen),
 		       tcph, udph, sport, dport,
 		       src, dst, proto, payload, payload_len, src_to_dst_direction));
@@ -997,8 +983,8 @@ static void setupDetection(u_int16_t thread_id) {
   ndpi_set_protocol_detection_bitmask2(ndpi_thread_info[thread_id].ndpi_struct, &all);
 
   // allocate memory for id and flow tracking
-  size_id_struct = ndpi_detection_get_sizeof_ndpi_id_struct();
-  size_flow_struct = ndpi_detection_get_sizeof_ndpi_flow_struct();
+  size_id_struct = sizeof(struct ndpi_id_struct);
+  size_flow_struct = sizeof(struct ndpi_flow_struct);
 
   // clear memory for results
   memset(ndpi_thread_info[thread_id].stats.protocol_counter, 0, sizeof(ndpi_thread_info[thread_id].stats.protocol_counter));
@@ -1029,7 +1015,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
 				      const u_int64_t time,
 				      u_int16_t vlan_id,
 				      const struct ndpi_iphdr *iph,
-				      struct ndpi_ip6_hdr *iph6,
+				      struct ndpi_ipv6hdr *iph6,
 				      u_int16_t ip_offset,
 				      u_int16_t ipsize, u_int16_t rawsize) {
   struct ndpi_id_struct *src, *dst;
@@ -1064,9 +1050,8 @@ static unsigned int packet_processing(u_int16_t thread_id,
   } else {
     return(0);
   }
+  //method for add the ip node in hash table, saltar dmz_module.
 
-  //method for printing info, saltar dmz_module.
-  // print_info(flow->upper_ip, flow->upper_name, flow->protocol,flow->lower_port,flow->packets);
   add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,(int)flow->lower_port,flow->packets);
 
   if(flow->detection_completed) return(0);
@@ -1090,31 +1075,6 @@ static unsigned int packet_processing(u_int16_t thread_id,
       snprintf(flow->ssl.server_certificate, sizeof(flow->ssl.server_certificate), "%s", flow->ndpi_flow->protos.ssl.server_certificate);
     }
 
-#if 0
-    if(verbose > 1) {
-      if(ndpi_is_proto(flow->detected_protocol, NDPI_PROTOCOL_HTTP)) {
-	char *method;
-
-	printf("[URL] %s\n", ndpi_get_http_url(ndpi_thread_info[thread_id].ndpi_struct, ndpi_flow));
-	printf("[Content-Type] %s\n", ndpi_get_http_content_type(ndpi_thread_info[thread_id].ndpi_struct, ndpi_flow));
-
-	switch(ndpi_get_http_method(ndpi_thread_info[thread_id].ndpi_struct, ndpi_flow)) {
-	case HTTP_METHOD_OPTIONS: method = "HTTP_METHOD_OPTIONS"; break;
-	case HTTP_METHOD_GET:     method = "HTTP_METHOD_GET"; break;
-	case HTTP_METHOD_HEAD:    method = "HTTP_METHOD_HEAD"; break;
-	case HTTP_METHOD_POST:    method = "HTTP_METHOD_POST"; break;
-	case HTTP_METHOD_PUT:     method = "HTTP_METHOD_PUT"; break;
-	case HTTP_METHOD_DELETE:  method = "HTTP_METHOD_DELETE"; break;
-	case HTTP_METHOD_TRACE:   method = "HTTP_METHOD_TRACE"; break;
-	case HTTP_METHOD_CONNECT: method = "HTTP_METHOD_CONNECT"; break;
-	default:                  method = "HTTP_METHOD_UNKNOWN"; break;
-	}
-
-	printf("[Method] %s\n", method);
-      }
-    }
-#endif
-
     free_ndpi_flow(flow);
 
     if(verbose > 1) {
@@ -1124,14 +1084,10 @@ static unsigned int packet_processing(u_int16_t thread_id,
 	    flow->detected_protocol.master_protocol = NDPI_PROTOCOL_UNKNOWN;
 	}
       }
+
       printFlow(thread_id, flow);
     }
   }
-
-#if 0
-  if(ndpi_flow->l4.tcp.host_server_name[0] != '\0')
-    printf("%s\n", ndpi_flow->l4.tcp.host_server_name);
-#endif
 
   if(live_capture) {
     if(ndpi_thread_info[thread_id].last_idle_scan_time + IDLE_SCAN_PERIOD < ndpi_thread_info[thread_id].last_time) {
@@ -1147,7 +1103,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
       ndpi_thread_info[thread_id].last_idle_scan_time = ndpi_thread_info[thread_id].last_time;
     }
   }
-  flow->packets = 0;
+
   return 0;
 }
 
@@ -1336,12 +1292,6 @@ static void printResults(u_int64_t tot_usec) {
 	printf("\tGuessed flow protos:   %-13u\n", cumulative_stats.guessed_flow_protocols);
     }
   }
-
-    //---------------------------Our Print List---------------------------------------------------------------------
-    
-    //let this off for now, it's spamming too much.
-    print_hash();
-   
 
   if(json_flag) {
 #ifdef HAVE_JSON_C
@@ -1587,7 +1537,7 @@ static void openPcapFileOrDevice(u_int16_t thread_id) {
   } else {
     live_capture = 1;
 
-    //if((!json_flag) && (!quiet_mode)) printf("Capturing live traffic from device %s...\n", _pcap_file[thread_id]);
+    if((!json_flag) && (!quiet_mode)) printf("Capturing live traffic from device %s...\n", _pcap_file[thread_id]);
   }
 
   configurePcapHandle(thread_id);
@@ -1611,40 +1561,47 @@ static void pcap_packet_callback(u_char *args,
   /*
    * Declare pointers to packet headers
    */
-  /** --- Ethernet header --- **/
+  
+  /* --- Ethernet header --- */
   const struct ndpi_ethhdr *ethernet;
-  /** --- Cisco HDLC header --- **/
+  /* --- Ethernet II header --- */
+  const struct ndpi_ethhdr *ethernet_2;
+  /* --- LLC header --- */
+  const struct ndpi_llc_header *llc;
+
+  /* --- Cisco HDLC header --- */
   const struct ndpi_chdlc *chdlc;
-
-  /** --- ieee802.11 --- **/
-  /* Radio Tap header */
-  const struct ndpi_radiotap_header *radiotap;
-  /* LLC header */
-  const struct ndpi_llc_header_proto *llc;
-  /* Data frame */
-  const struct ndpi_wifi_data_frame *wifi_data;
-
-  /* SLARP frame */
+  /* --- SLARP frame --- */
   struct ndpi_slarp *slarp;
-  /* CDP */
+  /* --- CDP --- */
   struct ndpi_cdp *cdp;
+
+  /* --- Radio Tap header --- */
+  const struct ndpi_radiotap_header *radiotap;
+  /* --- Wifi header --- */
+  const struct ndpi_wifi_header *wifi;
+
+  /* --- MPLS header --- */
+  struct ndpi_mpls_header *mpls;
 
   /** --- IP header --- **/
   struct ndpi_iphdr *iph;
   /** --- IPv6 header --- **/
-  struct ndpi_ip6_hdr *iph6;
+  struct ndpi_ipv6hdr *iph6;
 
   /* lengths and offsets */
   u_int16_t eth_offset = 0;
   u_int16_t radio_len;
   u_int16_t fc;
-  int wifi_data_len;
-  int llc_len;
-  u_int16_t llc_ether_type;
+  u_int16_t type;
+  int wifi_len;
+  int llc_off;
+  int pyld_eth_len = 0;
+  int check;
   u_int32_t fcs;
 
   u_int64_t time;
-  u_int16_t type, ip_offset, ip_len, ip6_offset;
+  u_int16_t ip_offset, ip_len, ip6_offset;
   u_int16_t frag_off = 0, vlan_id = 0;
   u_int8_t proto = 0;
   u_int32_t label;
@@ -1695,7 +1652,7 @@ static void pcap_packet_callback(u_char *args,
 
       ip_offset = 4 + eth_offset;
 
-      /* Cisco PPP in HDLC-like framing - 50*/
+      /* Cisco PPP in HDLC-like framing - 50 */
     case DLT_PPP_SERIAL:
       chdlc = (struct ndpi_chdlc *) &packet[eth_offset];
       ip_offset = sizeof(struct ndpi_chdlc); /* CHDLC_OFF = 4 */
@@ -1713,7 +1670,21 @@ static void pcap_packet_callback(u_char *args,
     case DLT_EN10MB :
       ethernet = (struct ndpi_ethhdr *) &packet[eth_offset];
       ip_offset = sizeof(struct ndpi_ethhdr) + eth_offset;
-      type = ntohs(ethernet->h_proto);
+      check = ntohs(ethernet->h_proto);
+
+      if(check <= 1500)
+	pyld_eth_len = check;
+      else if (check >= 1536)
+	type = check;
+
+      if(pyld_eth_len != 0) {
+      /* check for LLC layer with SNAP extension */
+	if(packet[ip_offset] == SNAP) {
+	  llc = (struct ndpi_llc_header *)(&packet[ip_offset]);
+	  type = llc->snap.proto_ID;
+	  ip_offset += + 8;
+	}
+      }
       break;
 
       /* Linux Cooked Capture - 113 */
@@ -1737,73 +1708,70 @@ static void pcap_packet_callback(u_char *args,
       fcs = header->len - 4;
 
       /* Calculate 802.11 header length (variable) */
-      wifi_data = (struct ndpi_wifi_data_frame*)( packet + eth_offset + radio_len);
-      fc = wifi_data->fc;
+      wifi = (struct ndpi_wifi_header*)( packet + eth_offset + radio_len);
+      fc = wifi->fc;
 
       /* check wifi data presence */
       if(FCF_TYPE(fc) == WIFI_DATA) {
 	if((FCF_TO_DS(fc) && FCF_FROM_DS(fc) == 0x0) ||
 	   (FCF_TO_DS(fc) == 0x0 && FCF_FROM_DS(fc)))
-	  wifi_data_len = 26; /* + 4 byte fcs */
-
-	/* TODO: check QoS Control for aggregated MSDU */
+	  wifi_len = 26; /* + 4 byte fcs */
       } else   /* no data frames */
 	break;
 
       /* Check ether_type from LLC */
-      llc = (struct ndpi_llc_header_proto*)(packet + eth_offset + wifi_data_len + radio_len);
-      llc_ether_type = ntohs(llc->ether_IP_type);
+      llc = (struct ndpi_llc_header*)(packet + eth_offset + wifi_len + radio_len);
+      if(llc->dsap == SNAP)
+	type = ntohs(llc->snap.proto_ID);
 
       /* Set IP header offset */
-      ip_offset = wifi_data_len + radio_len + sizeof(struct ndpi_llc_header_proto) + eth_offset;
+      ip_offset = wifi_len + radio_len + sizeof(struct ndpi_llc_header) + eth_offset;
       break;
 
+  case DLT_RAW:
+    ip_offset = eth_offset = 0;
+    break;
+
     default:
+      printf("Unknown datalink %d\n", datalink_type);
       return;
     }
 
-  while(1) {
-    if(type == VLAN) {
-      vlan_id = ((packet[ip_offset] << 8) + packet[ip_offset+1]) & 0xFFF;
-      type = (packet[ip_offset+2] << 8) + packet[ip_offset+3];
+  /* check ether type */
+  if(type == VLAN) {
+    vlan_id = ((packet[ip_offset] << 8) + packet[ip_offset+1]) & 0xFFF;
+    type = (packet[ip_offset+2] << 8) + packet[ip_offset+3];
+    ip_offset += 4;
+    vlan_packet = 1;
+  } else if(type == MPLS_UNI || type == MPLS_MULTI) {    
+    mpls = (struct ndpi_mpls_header *) &packet[ip_offset];
+    label = ntohl(mpls->label);
+    /* label = ntohl(*((u_int32_t*)&packet[ip_offset])); */
+    ndpi_thread_info[thread_id].stats.mpls_count++;
+    type = ETH_P_IP, ip_offset += 4;
+    
+    while((label & 0x100) != 0x100) {
       ip_offset += 4;
-      vlan_packet = 1;
-      break;
+      label = ntohl(mpls->label);
     }
-    else if(type == MPLS_UNI || type == MPLS_MULTI) {
-      label = ntohl(*((u_int32_t*)&packet[ip_offset]));
-      ndpi_thread_info[thread_id].stats.mpls_count++;
-      type = 0x800, ip_offset += 4;
-
-      while((label & 0x100) != 0x100) {
-	ip_offset += 4;
-	label = ntohl(*((u_int32_t*)&packet[ip_offset]));
-      }
-      break;
+  }
+  else if(type == SLARP) {
+    slarp = (struct ndpi_slarp *) &packet[ip_offset];
+    if(slarp->slarp_type == 0x02 || slarp->slarp_type == 0x00 || slarp->slarp_type == 0x01) {
+      /* TODO if info are needed */
     }
-    else if(type == SLARP) {
-      slarp = (struct ndpi_slarp *) &packet[ip_offset];
-      if(slarp->slarp_type == 0x02 || slarp->slarp_type == 0x00 || slarp->slarp_type == 0x01) {
-	/* TODO if info are needed */
-      }
-      slarp_pkts++;
-      break;
-    }
-    else if(type == CISCO_D_PROTO) {
-      cdp = (struct ndpi_cdp *) &packet[ip_offset];
-      cdp_pkts++;
-      break;
-    }    
-    else if(type == PPPoE) {
-      ndpi_thread_info[thread_id].stats.pppoe_count++;
-      type = 0x0800;
-      ip_offset += 8;
-      break;
-    }
-    else
-      break;
-  } /* while(1) */
-
+    slarp_pkts++;
+  }
+  else if(type == CISCO_D_PROTO) {
+    cdp = (struct ndpi_cdp *) &packet[ip_offset];
+    cdp_pkts++;
+  }    
+  else if(type == PPPoE) {
+    ndpi_thread_info[thread_id].stats.pppoe_count++;
+    type = ETH_P_IP;
+    ip_offset += 8;
+  }
+  
   ndpi_thread_info[thread_id].stats.vlan_count += vlan_packet;
 
  iph_check:
@@ -1819,7 +1787,7 @@ static void pcap_packet_callback(u_char *args,
       static u_int8_t cap_warning_used = 0;
 
       if(cap_warning_used == 0) {
-	if((!json_flag) && (!quiet_mode)) //printf("\n\nWARNING: packet capture size is smaller than packet size, DETECTION MIGHT NOT WORK CORRECTLY\n\n");
+	if((!json_flag) && (!quiet_mode)) printf("\n\nWARNING: packet capture size is smaller than packet size, DETECTION MIGHT NOT WORK CORRECTLY\n\n");
 	cap_warning_used = 1;
       }
     }
@@ -1839,7 +1807,7 @@ static void pcap_packet_callback(u_char *args,
       ndpi_thread_info[thread_id].stats.fragmented_count++;
 
       if(ipv4_frags_warning_used == 0) {
-	if((!json_flag) && (!quiet_mode)) //printf("\n\nWARNING: IPv4 fragments are not handled by this demo (nDPI supports them)\n");
+	if((!json_flag) && (!quiet_mode)) printf("\n\nWARNING: IPv4 fragments are not handled by this demo (nDPI supports them)\n");
 	ipv4_frags_warning_used = 1;
       }
 
@@ -1847,9 +1815,9 @@ static void pcap_packet_callback(u_char *args,
       return;
     }
   } else if(iph->version == 6) {
-    iph6 = (struct ndpi_ip6_hdr *)&packet[ip_offset];
+    iph6 = (struct ndpi_ipv6hdr *)&packet[ip_offset];
     proto = iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-    ip_len = sizeof(struct ndpi_ip6_hdr);
+    ip_len = sizeof(struct ndpi_ipv6hdr);
 
     if(proto == 0x3C /* IPv6 destination option */) {
 
@@ -1859,22 +1827,13 @@ static void pcap_packet_callback(u_char *args,
     }
     iph = NULL;
 
-    /* tunnel 6in4 */
-  /* ipv6in4: */
-  /*   ip6_offset = ip_len + ip_offset; */
-  /*   iph6 = (struct ndpi_ip6_hdr *)&packet[ip6_offset]; */
-  /*   proto = iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt; */
-  /*   ip_len = sizeof(struct ndpi_ip6_hdr); */
-  /*   ip_offset = ip_len + ip6_offset; */
-  /*   iph = NULL; */
-
   } else {
     static u_int8_t ipv4_warning_used = 0;
 
   v4_warning:
     if(ipv4_warning_used == 0) {
       if((!json_flag) && (!quiet_mode))
-	//printf("\n\nWARNING: only IPv4/IPv6 packets are supported in this demo (nDPI supports both IPv4 and IPv6), all other packets will be discarded\n\n");
+	printf("\n\nWARNING: only IPv4/IPv6 packets are supported in this demo (nDPI supports both IPv4 and IPv6), all other packets will be discarded\n\n");
       ipv4_warning_used = 1;
     }
     ndpi_thread_info[thread_id].stats.total_discarded_bytes +=  header->len;
@@ -1950,7 +1909,6 @@ static void pcap_packet_callback(u_char *args,
   /* process the packet */
   packet_processing(thread_id, time, vlan_id, iph, iph6,
 		    ip_offset, header->len - ip_offset, header->len);
-
 }
 
 /* ******************************************************************** */
@@ -1974,11 +1932,11 @@ void *processing_thread(void *_thread_id) {
     if(pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
       fprintf(stderr, "Error while binding thread %ld to core %d\n", thread_id, core_affinity[thread_id]);
     else {
-      if((!json_flag) && (!quiet_mode)){} //printf("Running thread %ld on core %d...\n", thread_id, core_affinity[thread_id]);
+      if((!json_flag) && (!quiet_mode)) printf("Running thread %ld on core %d...\n", thread_id, core_affinity[thread_id]);
     }
   } else
 #endif
-    if((!json_flag) && (!quiet_mode)){} //printf("Running thread %ld...\n", thread_id);
+    if((!json_flag) && (!quiet_mode)) printf("Running thread %ld...\n", thread_id);
 
  pcap_loop:
   runPcapLoop(thread_id);
@@ -2039,7 +1997,7 @@ void test_lib() {
 int main(int argc, char **argv) {
   int i;
 
-  
+
   //-------------------Loading config file for DMZ_MODULE --------------------
   load_file();
   pthread_t continuous_learning_t;
@@ -2047,6 +2005,10 @@ int main(int argc, char **argv) {
   pthread_create(&continuous_learning_t, NULL, continuous_learning, (void*)t_name);
 
   //--------------------------------------------------------------------------
+
+
+
+
   memset(ndpi_thread_info, 0, sizeof(ndpi_thread_info));
   memset(&pcap_start, 0, sizeof(pcap_start));
   memset(&pcap_end, 0, sizeof(pcap_end));
@@ -2054,17 +2016,18 @@ int main(int argc, char **argv) {
   parseOptions(argc, argv);
 
   if((!json_flag) && (!quiet_mode)) {
-    // printf("\n-----------------------------------------------------------\n"
-	   // "* NOTE: This is demo app to show *some* nDPI features.\n"
-	   // "* In this demo we have implemented only some basic features\n"
-	   // "* just to show you what you can do with the library. Feel \n"
-	   // "* free to extend it and send us the patches for inclusion\n"
-	   // "------------------------------------------------------------\n\n");
+    printf("\n-----------------------------------------------------------\n"
+	   "* NOTE: This is demo app to show *some* nDPI features.\n"
+	   "* In this demo we have implemented only some basic features\n"
+	   "* just to show you what you can do with the library. Feel \n"
+	   "* free to extend it and send us the patches for inclusion\n"
+	   "------------------------------------------------------------\n\n");
 
-    //printf("Using nDPI (%s) [%d thread(s)]\n", ndpi_revision(), num_threads);
+    printf("Using nDPI (%s) [%d thread(s)]\n", ndpi_revision(), num_threads);
   }
 
   signal(SIGINT, sigproc);
+
   for(i=0; i<num_loops; i++)
     test_lib();
 
@@ -2087,16 +2050,6 @@ struct timezone {
   int tz_minuteswest; /* minutes W of Greenwich */
   int tz_dsttime;     /* type of dst correction */
 };
-
-/* ***************************************************** */
-
-#if 0
-int gettimeofday(struct timeval *tv, void *notUsed) {
-  tv->tv_sec = time(NULL);
-  tv->tv_usec = 0;
-  return(0);
-}
-#endif
 
 /* ***************************************************** */
 
