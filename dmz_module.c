@@ -1,4 +1,4 @@
-#include <stdio.h>
+	#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -7,6 +7,7 @@
 #include <math.h>
 #include <tgmath.h>
 #include "linked_list.c"
+#include "slog.h"
 
 #define POLL_TIME 10
 #define MAX_CACHE 1000000
@@ -100,6 +101,17 @@ int init_cache()        {
     is_adding = 0;
     is_polling = 0;
 
+    /*Log library parameters
+    * The three final parameters are overwritten by the log.conf file
+    */ 
+    slog_init("report", "log.conf", 3, 3, 1);
+    slog(2, SLOG_INFO, " Execução Iniciada");
+
+    /*
+    	Examples to print the log 
+	    slog(3, SLOG_INFO, " Just file");
+		slog(0, SLOG_WARN, teste);
+    */
 }
 
 long double poisson(int k, int lam)     {
@@ -309,8 +321,10 @@ int cmpfunc (const void * a, const void * b) {
 * Find ip's for a given PORT
 */
 void print_ips_by_port(port_node * port){
-	//printf("\n\nALERT! PORT SUSPICIOUS: %d\n",ntohs(port->port_name));
-	printf("ALERTA! PORTA SUSPEITA: %d\n",ntohs(port->port_name));
+
+	//The strclr doesn't work on normal editors, such as, sublime, vim...
+	slog(0, SLOG_NONE, "[%s] Ataque na porta %d", strclr(CLR_RED, "ATK"),ntohs(port->port_name));
+	
 
 	ip_alert * itr = port->upper_ips->head, *next = NULL;
 	ip_alert * top_senders = NULL;
@@ -562,6 +576,10 @@ void verify_poisson(port_node *itr_port) {
 	itr_port->current_packets = 0;
 }
 
+char *int_to_string(const unsigned int port_name){
+
+}
+
 /*
 * verifiy if baseline is above package_threshold
 */
@@ -569,7 +587,10 @@ void verify_baseline(port_node *port){
 	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
-		printf("Fluxo suspeito!\n");
+
+
+		slog(1, SLOG_WARN, "Fluxo suspeito na porta %d",ntohs(port->port_name));
+
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
 			print_ips_by_port(port);
