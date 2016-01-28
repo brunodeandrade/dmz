@@ -1,4 +1,4 @@
-	#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -11,7 +11,7 @@
 
 #define POLL_TIME 10
 #define MAX_CACHE 1000000
-#define NUMBER_TOP_SENDERS INT_MAX
+#define NUMBER_TOP_SENDERS 10
 
 long double cache_log[MAX_CACHE];
 long double cache_sum[MAX_CACHE];
@@ -346,7 +346,7 @@ void print_ips_by_port(port_node * port){
 		}
 		itr = itr->next;
 	}
-	
+	slog(0,SLOG_INFO,"Number of iterations: %d, size of upper ips %d",i,number_of_upper_ips);	
 
 	qsort(top_senders,number_of_upper_ips,sizeof(ip_alert),cmpfunc);
 
@@ -359,12 +359,12 @@ void print_ips_by_port(port_node * port){
 				// printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
 
 
-				slog(1, SLOG_INFO, "\t%dº Top Sender IP %s with packets: %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
+				slog(1, SLOG_NONE, "\t[TOPSND] %d -  Top Sender IP %s with packets: %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 				top_senders[i].packets = 0;
 			}
 		}
 		else {
-			slog(4, SLOG_INFO, "\t%d Other Sender IP %s with packets %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
+			slog(4, SLOG_NONE, "\t[SND] %d Other Sender IP %s with packets %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 		}
 	}
 

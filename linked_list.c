@@ -58,6 +58,7 @@ void delete_all(ip_alert_list * list){
 	}
 	list->head = NULL;
 	list->tail = NULL;
+	list->size = 0;
 }
 
 int delete_from_list(ip_alert_list * list, int upper_ip){
