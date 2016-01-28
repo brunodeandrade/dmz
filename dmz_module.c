@@ -356,13 +356,15 @@ void print_ips_by_port(port_node * port){
 		if(i < NUMBER_TOP_SENDERS) {
 			if (top_senders[i].upper_name){
 				//printf("\t %d - IP: %s packets: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
-				printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
+				// printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
 
+
+				slog(1, SLOG_INFO, "\t%dº Top Sender IP %s with packets: %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 				top_senders[i].packets = 0;
 			}
 		}
 		else {
-			break;
+			slog(4, SLOG_INFO, "\t%d Other Sender IP %s with packets %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 		}
 	}
 
