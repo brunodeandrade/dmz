@@ -1053,6 +1053,9 @@ static unsigned int packet_processing(u_int16_t thread_id,
   //method for add the ip node in hash table, saltar dmz_module.
 
   add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,(int)flow->lower_port,flow->packets);
+  /* and a little bit of black magic */
+  int count = ndpi_thread_info[thread_id].stats.ndpi_flow_count;
+  //printf("Number of flows: %d\n", ndpi_thread_info[thread_id].stats.ndpi_flow_count);
 
   if(flow->detection_completed) return(0);
 
@@ -1157,12 +1160,12 @@ char* formatPackets(float numPkts, char *buf) {
 
 /* ***************************************************** */
 
-#ifdef HAVE_JSON_C
-static void json_init() {
-  jArray_known_flows = json_object_new_array();
-  jArray_unknown_flows = json_object_new_array();
-}
-#endif
+// #ifdef HAVE_JSON_C
+// static void json_init() {
+//   jArray_known_flows = json_object_new_array();
+//   jArray_unknown_flows = json_object_new_array();
+// }
+// #endif
 
 /* ***************************************************** */
 
@@ -1197,10 +1200,10 @@ static void printResults(u_int64_t tot_usec) {
   struct thread_stats cumulative_stats;
   int thread_id;
   char buf[32];
-#ifdef HAVE_JSON_C
-  FILE *json_fp = NULL;
-  json_object *jObj_main, *jObj_trafficStats, *jArray_detProto, *jObj;
-#endif
+// #ifdef HAVE_JSON_C
+//   FILE *json_fp = NULL;
+//   json_object *jObj_main, *jObj_trafficStats, *jArray_detProto, *jObj;
+// #endif
   long long unsigned int breed_stats[NUM_BREEDS] = { 0 };
 
   memset(&cumulative_stats, 0, sizeof(cumulative_stats));
@@ -1294,40 +1297,40 @@ static void printResults(u_int64_t tot_usec) {
   }
 
   if(json_flag) {
-#ifdef HAVE_JSON_C
-    if((json_fp = fopen(_jsonFilePath,"w")) == NULL) {
-      printf("Error createing .json file %s\n", _jsonFilePath);
-      json_flag = 0;
-    } else {
-      jObj_main = json_object_new_object();
-      jObj_trafficStats = json_object_new_object();
-      jArray_detProto = json_object_new_array();
+// #ifdef HAVE_JSON_C
+//     if((json_fp = fopen(_jsonFilePath,"w")) == NULL) {
+//       printf("Error createing .json file %s\n", _jsonFilePath);
+//       json_flag = 0;
+//     } else {
+//       jObj_main = json_object_new_object();
+//       jObj_trafficStats = json_object_new_object();
+//       jArray_detProto = json_object_new_array();
 
-      json_object_object_add(jObj_trafficStats,"ethernet.bytes",json_object_new_int64(cumulative_stats.total_wire_bytes));
-      json_object_object_add(jObj_trafficStats,"discarded.bytes",json_object_new_int64(cumulative_stats.total_discarded_bytes));
-      json_object_object_add(jObj_trafficStats,"ip.packets",json_object_new_int64(cumulative_stats.ip_packet_count));
-      json_object_object_add(jObj_trafficStats,"total.packets",json_object_new_int64(cumulative_stats.raw_packet_count));
-      json_object_object_add(jObj_trafficStats,"ip.bytes",json_object_new_int64(cumulative_stats.total_ip_bytes));
-      json_object_object_add(jObj_trafficStats,"avg.pkt.size",json_object_new_int(cumulative_stats.total_ip_bytes/cumulative_stats.raw_packet_count));
-      json_object_object_add(jObj_trafficStats,"unique.flows",json_object_new_int(cumulative_stats.ndpi_flow_count));
-      json_object_object_add(jObj_trafficStats,"tcp.pkts",json_object_new_int64(cumulative_stats.tcp_count));
-      json_object_object_add(jObj_trafficStats,"udp.pkts",json_object_new_int64(cumulative_stats.udp_count));
-      json_object_object_add(jObj_trafficStats,"vlan.pkts",json_object_new_int64(cumulative_stats.vlan_count));
-      json_object_object_add(jObj_trafficStats,"mpls.pkts",json_object_new_int64(cumulative_stats.mpls_count));
-      json_object_object_add(jObj_trafficStats,"pppoe.pkts",json_object_new_int64(cumulative_stats.pppoe_count));
-      json_object_object_add(jObj_trafficStats,"fragmented.pkts",json_object_new_int64(cumulative_stats.fragmented_count));
-      json_object_object_add(jObj_trafficStats,"max.pkt.size",json_object_new_int(cumulative_stats.max_packet_len));
-      json_object_object_add(jObj_trafficStats,"pkt.len_min64",json_object_new_int64(cumulative_stats.packet_len[0]));
-      json_object_object_add(jObj_trafficStats,"pkt.len_64_128",json_object_new_int64(cumulative_stats.packet_len[1]));
-      json_object_object_add(jObj_trafficStats,"pkt.len_128_256",json_object_new_int64(cumulative_stats.packet_len[2]));
-      json_object_object_add(jObj_trafficStats,"pkt.len_256_1024",json_object_new_int64(cumulative_stats.packet_len[3]));
-      json_object_object_add(jObj_trafficStats,"pkt.len_1024_1500",json_object_new_int64(cumulative_stats.packet_len[4]));
-      json_object_object_add(jObj_trafficStats,"pkt.len_grt1500",json_object_new_int64(cumulative_stats.packet_len[5]));
-      json_object_object_add(jObj_trafficStats,"guessed.flow.protos",json_object_new_int(cumulative_stats.guessed_flow_protocols));
+//       json_object_object_add(jObj_trafficStats,"ethernet.bytes",json_object_new_int64(cumulative_stats.total_wire_bytes));
+//       json_object_object_add(jObj_trafficStats,"discarded.bytes",json_object_new_int64(cumulative_stats.total_discarded_bytes));
+//       json_object_object_add(jObj_trafficStats,"ip.packets",json_object_new_int64(cumulative_stats.ip_packet_count));
+//       json_object_object_add(jObj_trafficStats,"total.packets",json_object_new_int64(cumulative_stats.raw_packet_count));
+//       json_object_object_add(jObj_trafficStats,"ip.bytes",json_object_new_int64(cumulative_stats.total_ip_bytes));
+//       json_object_object_add(jObj_trafficStats,"avg.pkt.size",json_object_new_int(cumulative_stats.total_ip_bytes/cumulative_stats.raw_packet_count));
+//       json_object_object_add(jObj_trafficStats,"unique.flows",json_object_new_int(cumulative_stats.ndpi_flow_count));
+//       json_object_object_add(jObj_trafficStats,"tcp.pkts",json_object_new_int64(cumulative_stats.tcp_count));
+//       json_object_object_add(jObj_trafficStats,"udp.pkts",json_object_new_int64(cumulative_stats.udp_count));
+//       json_object_object_add(jObj_trafficStats,"vlan.pkts",json_object_new_int64(cumulative_stats.vlan_count));
+//       json_object_object_add(jObj_trafficStats,"mpls.pkts",json_object_new_int64(cumulative_stats.mpls_count));
+//       json_object_object_add(jObj_trafficStats,"pppoe.pkts",json_object_new_int64(cumulative_stats.pppoe_count));
+//       json_object_object_add(jObj_trafficStats,"fragmented.pkts",json_object_new_int64(cumulative_stats.fragmented_count));
+//       json_object_object_add(jObj_trafficStats,"max.pkt.size",json_object_new_int(cumulative_stats.max_packet_len));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_min64",json_object_new_int64(cumulative_stats.packet_len[0]));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_64_128",json_object_new_int64(cumulative_stats.packet_len[1]));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_128_256",json_object_new_int64(cumulative_stats.packet_len[2]));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_256_1024",json_object_new_int64(cumulative_stats.packet_len[3]));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_1024_1500",json_object_new_int64(cumulative_stats.packet_len[4]));
+//       json_object_object_add(jObj_trafficStats,"pkt.len_grt1500",json_object_new_int64(cumulative_stats.packet_len[5]));
+//       json_object_object_add(jObj_trafficStats,"guessed.flow.protos",json_object_new_int(cumulative_stats.guessed_flow_protocols));
 
-      json_object_object_add(jObj_main,"traffic.statistics",jObj_trafficStats);
-    }
-#endif
+//       json_object_object_add(jObj_main,"traffic.statistics",jObj_trafficStats);
+//     }
+// #endif
   }
 
   if((!json_flag) && (!quiet_mode)) printf("\n\nDetected protocols:\n");
@@ -1352,19 +1355,19 @@ static void printResults(u_int64_t tot_usec) {
 	       (long long unsigned int)cumulative_stats.protocol_counter_bytes[i],
 	       cumulative_stats.protocol_flows[i]);
       } else {
-#ifdef HAVE_JSON_C
-	if(json_fp) {
-	  jObj = json_object_new_object();
+// #ifdef HAVE_JSON_C
+// 	if(json_fp) {
+// 	  jObj = json_object_new_object();
 
-	  json_object_object_add(jObj,"name",json_object_new_string(ndpi_get_proto_name(ndpi_thread_info[0].ndpi_struct, i)));
-	  json_object_object_add(jObj,"breed",json_object_new_string(ndpi_get_proto_breed_name(ndpi_thread_info[0].ndpi_struct, breed)));
-	  json_object_object_add(jObj,"packets",json_object_new_int64(cumulative_stats.protocol_counter[i]));
-	  json_object_object_add(jObj,"bytes",json_object_new_int64(cumulative_stats.protocol_counter_bytes[i]));
-	  json_object_object_add(jObj,"flows",json_object_new_int(cumulative_stats.protocol_flows[i]));
+// 	  json_object_object_add(jObj,"name",json_object_new_string(ndpi_get_proto_name(ndpi_thread_info[0].ndpi_struct, i)));
+// 	  json_object_object_add(jObj,"breed",json_object_new_string(ndpi_get_proto_breed_name(ndpi_thread_info[0].ndpi_struct, breed)));
+// 	  json_object_object_add(jObj,"packets",json_object_new_int64(cumulative_stats.protocol_counter[i]));
+// 	  json_object_object_add(jObj,"bytes",json_object_new_int64(cumulative_stats.protocol_counter_bytes[i]));
+// 	  json_object_object_add(jObj,"flows",json_object_new_int(cumulative_stats.protocol_flows[i]));
 
-	  json_object_array_add(jArray_detProto,jObj);
-	}
-#endif
+// 	  json_object_array_add(jArray_detProto,jObj);
+// 	}
+// #endif
       }
 
       total_flow_bytes += cumulative_stats.protocol_counter_bytes[i];
@@ -1420,16 +1423,16 @@ static void printResults(u_int64_t tot_usec) {
   }
 
   if(json_flag != 0) {
-#ifdef HAVE_JSON_C
-    json_object_object_add(jObj_main,"detected.protos",jArray_detProto);
-    json_object_object_add(jObj_main,"known.flows",jArray_known_flows);
+// #ifdef HAVE_JSON_C
+//     json_object_object_add(jObj_main,"detected.protos",jArray_detProto);
+//     json_object_object_add(jObj_main,"known.flows",jArray_known_flows);
 
-    if(json_object_array_length(jArray_unknown_flows) != 0)
-      json_object_object_add(jObj_main,"unknown.flows",jArray_unknown_flows);
+//     if(json_object_array_length(jArray_unknown_flows) != 0)
+//       json_object_object_add(jObj_main,"unknown.flows",jArray_unknown_flows);
 
-    fprintf(json_fp,"%s\n",json_object_to_json_string(jObj_main));
-    fclose(json_fp);
-#endif
+//     fprintf(json_fp,"%s\n",json_object_to_json_string(jObj_main));
+//     fclose(json_fp);
+// #endif
   }
 }
 
@@ -1965,9 +1968,9 @@ void test_lib() {
   u_int64_t tot_usec;
   long thread_id;
 
-#ifdef HAVE_JSON_C
-  json_init();
-#endif
+// #ifdef HAVE_JSON_C
+//   json_init();
+// #endif
 
   for(thread_id = 0; thread_id < num_threads; thread_id++) {
     setupDetection(thread_id);
