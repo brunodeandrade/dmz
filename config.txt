@@ -6,5 +6,5 @@
 //Fifth - Package Threshold
 //Sixth - RO_BASELINE
 //Seventh - R1_BASELINE
-//Eighth - Verify Config
-//Nineth - Static or Dynamic mode
+//Eighth - Poisson = 0, Baseline = 1
+//Nineth - Static = 0, Dyamnic = 1

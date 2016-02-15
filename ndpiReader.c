@@ -1011,6 +1011,7 @@ static void terminateDetection(u_int16_t thread_id) {
 /* ***************************************************** */
 
 // ipsize = header->len - ip_offset ; rawsize = header->len
+int count_flows = 0;
 static unsigned int packet_processing(u_int16_t thread_id,
 				      const u_int64_t time,
 				      u_int16_t vlan_id,
@@ -1091,12 +1092,18 @@ static unsigned int packet_processing(u_int16_t thread_id,
       printFlow(thread_id, flow);
     }
   }
-  int i;
-  for(i=0; i<NUM_ROOTS; i++) {
-    ndpi_tdestroy(ndpi_thread_info[thread_id].ndpi_flows_root[i], ndpi_flow_freer);
-    ndpi_thread_info[thread_id].ndpi_flows_root[i] = NULL;
-  }
+  count_flows++;
 
+  /*DMZ*/
+  if(count_flows >= 30000) {
+    count_flows = 0;
+    int i;
+    for(i=0; i<NUM_ROOTS; i++) {
+      ndpi_tdestroy(ndpi_thread_info[thread_id].ndpi_flows_root[i], ndpi_flow_freer);
+      ndpi_thread_info[thread_id].ndpi_flows_root[i] = NULL;
+    }
+  }
+  /*DMZ*/
 
   if(live_capture) {
     if(ndpi_thread_info[thread_id].last_idle_scan_time + IDLE_SCAN_PERIOD < ndpi_thread_info[thread_id].last_time) {

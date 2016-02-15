@@ -489,7 +489,7 @@ void free_hash_list(GHashTable * hash_list){
 void iterate_and_print_ports(gpointer key, gpointer value, gpointer user_data) {
 	port_node *port = (port_node *)value;
 
-	printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",ntohs(port->port_name),port->current_packets,port->new_baseline,port->time_of_detection);
+	//printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",ntohs(port->port_name),port->current_packets,port->new_baseline,port->time_of_detection);
  	//printf(user_data, *(gint*)key, value);
 }
 
