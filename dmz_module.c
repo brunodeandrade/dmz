@@ -586,7 +586,7 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 
