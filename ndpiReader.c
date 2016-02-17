@@ -1092,17 +1092,14 @@ static unsigned int packet_processing(u_int16_t thread_id,
       printFlow(thread_id, flow);
     }
   }
-  count_flows++;
 
   /*DMZ*/
-  if(count_flows >= 30000) {
-    count_flows = 0;
     int i;
     for(i=0; i<NUM_ROOTS; i++) {
       ndpi_tdestroy(ndpi_thread_info[thread_id].ndpi_flows_root[i], ndpi_flow_freer);
       ndpi_thread_info[thread_id].ndpi_flows_root[i] = NULL;
     }
-  }
+  
   /*DMZ*/
 
   if(live_capture) {
@@ -1119,6 +1116,10 @@ static unsigned int packet_processing(u_int16_t thread_id,
       ndpi_thread_info[thread_id].last_idle_scan_time = ndpi_thread_info[thread_id].last_time;
     }
   }
+
+  /*DMZ*/
+  flow->packets = 0;
+  /*DMZ*/
 
   return 0;
 }

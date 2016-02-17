@@ -429,25 +429,29 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name, u_short protocol_id, int port_name , int current_packets){
 
 	if(!is_polling) {
-		is_adding = true;
 
-		ip_node * findable_ip = NULL;
+		if(ntohs(port_name) == 80) {
+			is_adding = true;
 
-		findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
+			ip_node * findable_ip = NULL;
 
-		// printf("Vai iterar...\n");
-		// g_hash_table_foreach(ip_list, (GHFunc)iterator, NULL);
-		// printf("Iterou.\n");
-		
-		if(findable_ip){		
-			find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
-		}else{
-			port_node * port = create_port_node(port_name, current_packets);
-			ip_node * ip = create_ip_node(lower_name,lower_ip);
-			insert_port_in_hash(ip,protocol_id,port,port_name);
-			g_hash_table_insert(ip_list,&lower_ip,ip);
-		}	
-		is_adding = false;
+			findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
+
+			// printf("Vai iterar...\n");
+			// g_hash_table_foreach(ip_list, (GHFunc)iterator, NULL);
+			// printf("Iterou.\n");
+			
+			if(findable_ip){		
+				find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
+			}else{
+				port_node * port = create_port_node(port_name, current_packets);
+				ip_node * ip = create_ip_node(lower_name,lower_ip);
+				insert_port_in_hash(ip,protocol_id,port,port_name);
+				g_hash_table_insert(ip_list,&lower_ip,ip);
+			}	
+		}
+			is_adding = false;
+
 	}
 }
 
@@ -586,7 +590,7 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 
