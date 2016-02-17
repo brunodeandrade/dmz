@@ -430,7 +430,7 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 
 	if(!is_polling) {
 
-		if(ntohs(port_name) == 80) {
+		
 			is_adding = true;
 
 			ip_node * findable_ip = NULL;
@@ -449,7 +449,7 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 				insert_port_in_hash(ip,protocol_id,port,port_name);
 				g_hash_table_insert(ip_list,&lower_ip,ip);
 			}	
-		}
+		
 			is_adding = false;
 
 	}
