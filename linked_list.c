@@ -1,9 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 typedef struct ip_alert{	
 	int upper_ip;
-	char * upper_name;
+	char upper_name[30];
 	int packets;
 	struct ip_alert * next;
 	struct ip_alert * prev;
@@ -35,8 +36,9 @@ ip_alert * create_ip_alert_node(int upper_ip, char * upper_name, int packets){
 		printf("Couldn't allocate ip_alert\n");
 		return NULL;
 	}
+
 	node->upper_ip = upper_ip;
-	node->upper_name = upper_name;
+	strcpy(node->upper_name,upper_name);
 	node->packets = packets;
 	node->prev = NULL;
 	node->next = NULL;
@@ -86,6 +88,7 @@ int delete_from_list(ip_alert_list * list, int upper_ip){
 }
 
 int push_back(ip_alert_list * list, ip_alert * node){
+
 	if(!node){
 		printf("Node is NULL\n");
 		return -1;

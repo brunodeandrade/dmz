@@ -21,7 +21,7 @@ enum { TCP, UDP, ICMP };
 
 typedef int bool;
 enum {false, true};
-enum {DYNAMIC, STATIC};
+enum {STATIC, DYNAMIC};
 
 
 typedef struct port_node{
@@ -158,7 +158,8 @@ int load_file(){
 	printf("\nTempo para aprendizado: %d segundos cada poll\n", POLL_TIME);
 	printf("Tempo total de aprendizado: %d polls\n", learning_time_sys);
 	printf("Tempo de espera (WAIT_ALERT): %d polls\n", wait_alert_sys);
-	printf("Limiar de detecção: %dx\n\n", package_threshold);
+	printf("Limiar de detecção: %dx\n", package_threshold);
+	printf("Tipo de deteccao: %d\n\n", learning_mode);
 	//printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,package_threshold);
 	return 0;
 }
@@ -339,7 +340,7 @@ void print_ips_by_port(port_node * port){
 	int i = 0;
 	while(itr){
 		if(itr->upper_name && itr->packets > 0){
-			top_senders[i].upper_name = itr->upper_name;
+			strcpy(top_senders[i].upper_name,itr->upper_name);
 			top_senders[i].upper_ip = itr->upper_ip;
 			top_senders[i].packets = itr->packets;
 			i++;
@@ -359,7 +360,7 @@ void print_ips_by_port(port_node * port){
 				// printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
 
 
-				slog(1, SLOG_NONE, "\t[TOPSND] %d -  Top Sender IP %s with packets: %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
+				slog(1, SLOG_NONE, "\t[TOPSND] %d -  Top Sender IP %s (upper_ip: %d) with packets: %d", i+1, top_senders[i].upper_name, ntohs(top_senders[i].upper_ip), top_senders[i].packets);
 				top_senders[i].packets = 0;
 			}
 		}
@@ -377,13 +378,22 @@ void find_upper_ip_and_increment (port_node *port, int upper_ip, char *upper_nam
 	findable_upper = find_node(port->upper_ips,upper_ip);
 
 	if(findable_upper) {
+		// ip_alert *node = NULL;	
+		// node = port->upper_ips->head;
+		// printf("\n --------------1------------\n");
+		// while(node) {
+		// 	printf("NODE: %s\n",node->upper_name);
+		// 	node = node->next;
+		// }
+		// printf("\n --------------2------------\n");
 		findable_upper->packets += current_packets;
 	}
 	else {
 		findable_upper = create_ip_alert_node(upper_ip,upper_name,current_packets);
 		if(!findable_upper)
 			return;		
-
+		
+		// printf("Vai adicionar o seguinte upper:  %s\n",upper_name);
 		push_back(port->upper_ips,findable_upper);
 
 	}
@@ -400,6 +410,7 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 	port_node * findable_port = find_port(ip_node, protocol_id, port_name);
 
 	if(findable_port) {
+
 		// printf("Current packets in pool: %d\n",findable_port->current_packets);
 		findable_port->current_packets += current_packets;
 		if(findable_port->is_suspicious){
@@ -424,24 +435,23 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 
 /*
 * Adds an IP node to the hash list
-
 */
 void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name, u_short protocol_id, int port_name , int current_packets){
 
 	if(!is_polling) {
 
-		
 			is_adding = true;
 
 			ip_node * findable_ip = NULL;
 
 			findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
 
-			// printf("Vai iterar...\n");
+			//printf("Vai iterar...\n");
 			// g_hash_table_foreach(ip_list, (GHFunc)iterator, NULL);
-			// printf("Iterou.\n");
-			
-			if(findable_ip){		
+			// printf("Iterou.\printf");
+			//n("IP: %s, %d mem: %p\n",lower_name, lower_ip, lower_ip);
+			//printf("IP: %s, %d mem: %p\n",upper_name, upper_ip, upper_ip);
+			if(findable_ip){	
 				find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
 			}else{
 				port_node * port = create_port_node(port_name, current_packets);
@@ -449,7 +459,6 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 				insert_port_in_hash(ip,protocol_id,port,port_name);
 				g_hash_table_insert(ip_list,&lower_ip,ip);
 			}	
-		
 			is_adding = false;
 
 	}
@@ -547,11 +556,9 @@ bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 * Set baselines
 */
 void set_baselines(port_node * port_node){
-	if(port_node->current_packets > 0){
 
-		port_node->old_baseline = R0_BASELINE * port_node->new_baseline;
-		port_node->new_baseline = (R1_BASELINE * port_node->current_packets) + port_node->old_baseline;
-	}
+	port_node->old_baseline = R0_BASELINE * port_node->new_baseline;
+	port_node->new_baseline = (R1_BASELINE * port_node->current_packets) + port_node->old_baseline;
 	port_node->current_packets = 0;
 }
 
@@ -590,7 +597,8 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	//printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	// printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
+	// 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 
@@ -606,8 +614,9 @@ void verify_baseline(port_node *port){
 		port->is_suspicious = false;
 		
 	} else {
-		if (learning_mode == DYNAMIC)
+		if (learning_mode == DYNAMIC){
 			set_baselines(port);
+		}
 	}
 	delete_all(port->upper_ips);
 	port->current_packets = 0;
