@@ -1,9 +1,11 @@
 #just ignore these.
 log.txt
-ndpiReader.o
+*.o
 .deps/
 Makefile.am
 Makefile.in
 Win32/
 ndpiReader
+*.log
+TestingDmzDOS/
 

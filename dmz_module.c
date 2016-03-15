@@ -139,7 +139,7 @@ long double poisson(int k, int lam)     {
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
 	if(!config_file){
-		printf("ERROR: Could not open file!\n\n\n");
+		slog(1, SLOG_ERROR, " Não foi possível abrir o arquivo!");
 		return -1;
 	}
 
@@ -147,14 +147,14 @@ int load_file(){
 		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
-		printf ("ERRO! Parâmetros inválidos. Por favor verifique se R0 + R1 < 1.\n");
-	//	printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
+		slog(1, SLOG_ERROR, " Parâmetros inválidos. Por favor verifique se R0 + R1 < 1.\n");
+		//	printf("ERROR! These parameters are not set up correctly. Please check if the R0 and R1 parameters < 1.\n");
 		exit (-1);
 	}
 
 	fclose(config_file);
 	init_cache();
-	printf ("\nArquivo de configuração lido com sucesso. Parâmetros do sistema:\n");
+	slog(2, SLOG_INFO, "Arquivo de configuração lido com sucesso. Parâmetros do sistema:\n");
 	printf("\nTempo para aprendizado: %d segundos cada poll\n", POLL_TIME);
 	printf("Tempo total de aprendizado: %d polls\n", learning_time_sys);
 	printf("Tempo de espera (WAIT_ALERT): %d polls\n", wait_alert_sys);
@@ -178,7 +178,7 @@ void print_info(long ip_number, char *ip_name, u_short protocol, int lower_port,
 ip_node * create_ip_node(char * ip_name, int lower_ip){
 	ip_node * node = (ip_node *) calloc (1,sizeof(ip_node));
 	if(!node){
-		printf("ip_node was not allocated correctly.\n\n\n");		
+		slog(1, SLOG_ERROR, " ip_node não foi alocado corretamente\n\n");
 		return NULL;
 	}	
 	node->ip_name = ip_name;
@@ -197,7 +197,7 @@ port_node * create_port_node(int port_name, int current_packets){
 	port_node * node = (port_node *) calloc (1,sizeof(port_node));
 
 	if(!node){
-		printf("port_node was not allocated correctly.\n\n\n");
+		slog(1, SLOG_ERROR, " port_node não foi alocado corretamente\n\n");
 		return NULL;
 	}	
 
@@ -240,8 +240,8 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 		case IPPROTO_ICMP:
 			g_hash_table_remove(ip->icmp_ports, &ports[port->port_name]);
 			break;
-		default: 
-			printf("not known protocol\n");
+		default:
+			slog(1, SLOG_ERROR, "Protocolo desconhecido @ remove_port()\n"); 
 			break;
 	}
 	
@@ -270,7 +270,7 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 			g_hash_table_insert(ip_node->icmp_ports,&ports[port_name],port);			
 			break;
 		default: 
-			printf("not known protocol\n");
+			slog(1, SLOG_ERROR, "Protocolo desconhecido @ insert_port_in_hash()\n"); 
 			break;
 	}
 
@@ -280,7 +280,6 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 * Search port in a hash.
 */
 
-//O BUG ESTA AQUI!!!!!!!!!!!!!
 port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 
 	port_node * findable_port = NULL;
@@ -291,17 +290,13 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 		findable_port = g_hash_table_lookup(ip_node->tcp_ports,&ports[port_name]);
 		break;
 	case IPPROTO_UDP:
-		//g_hash_table_foreach(ip_node->udp_ports, (GHFunc)iterator_port, NULL);
-
 		findable_port = g_hash_table_lookup(ip_node->udp_ports,&ports[port_name]);
-		// printf("port name pointer: %d\n", *port_name_pointer);
-		// if(findable_port) printf("Achou findable_port\n");
 		break;
 	case IPPROTO_ICMP:
 		findable_port = g_hash_table_lookup(ip_node->icmp_ports,&ports[port_name]);
 		break;
 	default: 
-		//printf("not known protocol\n");
+		slog(1, SLOG_ERROR, "Protocolo desconhecido @ find_port()\n"); 
 		break;
 	}
 
@@ -334,7 +329,7 @@ void print_ips_by_port(port_node * port){
 	top_senders = (ip_alert*)calloc(number_of_upper_ips,sizeof(ip_alert));
 
 	if(!top_senders){
-		printf("Couldn't allocate top_senders\n");
+		slog(1, SLOG_ERROR, "Couldn't allocate top_senders\n"); 
 		exit(-1);
 	}
 	int i = 0;
@@ -425,7 +420,7 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 		if(port)
 			insert_port_in_hash(ip_node, protocol_id, port,port_name);
 		else
-			printf("Not allocated.\n");
+			slog(1, SLOG_ERROR, "Não alocado @ find_port_and_increment \n");
 	}
 }
 
@@ -445,13 +440,8 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 			ip_node * findable_ip = NULL;
 
 			findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
-
-			//printf("Vai iterar...\n");
-			// g_hash_table_foreach(ip_list, (GHFunc)iterator, NULL);
-			// printf("Iterou.\printf");
-			//n("IP: %s, %d mem: %p\n",lower_name, lower_ip, lower_ip);
-			//printf("IP: %s, %d mem: %p\n",upper_name, upper_ip, upper_ip);
-			if(findable_ip){	
+			
+			if(findable_ip){		
 				find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
 			}else{
 				port_node * port = create_port_node(port_name, current_packets);
@@ -468,8 +458,6 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 static gboolean free_value(gpointer key, gpointer value, gpointer user_data) {
 
 	g_free(value);
-	//g_free(key);
-
 	return true;
 }
 
@@ -671,35 +659,6 @@ void iterate_to_learn() {
 	port_node * itr_port = NULL, *next_port = NULL;
 	g_hash_table_foreach(ip_list, (GHFunc)iterator_ips, NULL);
 }
-
-
-//TODO - Update to Glib hash
-// void iterate_learnt(ip_node *itr) {
-
-// 	ip_node * next = NULL;
-// 	port_node * itr_port = NULL, *next_port = NULL;
-// 	//printf("\nIteration learnt:\n");
-// 		for(; itr!= NULL;itr=next){
-// 			for(itr_port = itr->tcp_ports; itr_port != NULL; itr_port = next_port) {
-// 				//printf("\nport_tcp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-// 				verify_poisson(itr_port);
-// 				next_port = itr_port->hh.next;			
-// 			}
-
-// 			for(itr_port = itr->udp_ports; itr_port != NULL; itr_port = next_port) {
-// 				//printf("\nport_udp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-// 				verify_poisson(itr_port);
-// 				next_port = itr_port->hh.next;			
-// 			}
-// 			for(itr_port = itr->icmp_ports; itr_port != NULL; itr_port = next_port) {
-// 				//printf("\nport_icmp: %d, new_baseline: %f\n", itr_port->port_name,itr_port->new_baseline);
-// 				verify_poisson(itr_port);
-// 				next_port = itr_port->hh.next;			
-// 			}
-
-// 			next = itr->hh.next;
-// 		}
-// }
 
 /*
 * Learning Control - Poll Iteration
