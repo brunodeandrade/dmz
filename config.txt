@@ -1,4 +1,4 @@
-3 6 450 0.001 3 0.59 0.3 1 0
+3 5 450 0.01 3 0.59 0.3 1 1 10
 //First - WAIT_ALERT, the number of polls the system will wait before throwing an alert
 //Second - LEARNING_POLLS, the number of polls the system will use to learn the network behaviour
 //Third - A static baseline for the system
@@ -8,3 +8,4 @@
 //Seventh - R1_BASELINE
 //Eighth - Poisson = 0, Baseline = 1
 //Nineth - Static = 0, Dyamnic = 1
+//Tenth - minumum value for the baseline.
