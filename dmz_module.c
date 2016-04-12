@@ -87,14 +87,15 @@ void iterator(gpointer key, gpointer value, gpointer user_data) {
 
 
 
-int init_cache()        {
+int init_cache() {
 
 	ip_list = g_hash_table_new (g_direct_hash,g_int_equal);
 
     int i=1;
 
-    for(; i<MAX_CACHE; i++)
-        cache_log[i] = logl((long double)i);
+    for(; i<MAX_CACHE; i++){
+            cache_log[i] = logl((long double)i);
+        }
 
     memset(cache_sum, 0x0, MAX_CACHE);
 
@@ -121,18 +122,19 @@ long double poisson(int k, int lam)     {
         long double pvalue = 0;
         long double sum = 0;
 
-        if ( cache_sum[k] )
+        if ( cache_sum[k] ){
                 sum = cache_sum[k];
-        else {
+            }
+        else {	
                 while(c <= k)   {
                         sum += cache_log[c];
                         c++;
                 }
                 cache_sum[k] = sum;
         }
-
+        
         pvalue = cache_log[2] + k*cache_log[lam] - sum - lam;
-
+        //printf("cache_log:  %LF\n, pvalue: %LF",  cache_log[lam],pvalue);
         return pvalue;
 }
 
@@ -556,11 +558,10 @@ void set_baselines(port_node * port_node){
 */
 
 void verify_poisson(port_node *itr_port) {
-
-	itr_port->poisson_result = 1 - (1 + (1/poisson(itr_port->current_packets, itr_port->new_baseline)));
+	itr_port->poisson_result = 1 - (1 + (1/poisson((int)(itr_port->current_packets), (int)(itr_port->new_baseline))));
 	// Verificar o motivo de sempre o resultado da poisson estar sendo o mesmo o global_threshold
-    printf("poisson %f, port_name: %d, global: %f\n", itr_port->poisson_result, ntohs(itr_port->port_name), global_threshold);
-	if(itr_port->poisson_result > global_threshold) {
+    printf("poisson %LF, port_name: %d, global: %f, baseline: %f, packets %d\n", itr_port->poisson_result, ntohs(itr_port->port_name), global_threshold, itr_port->new_baseline, itr_port->current_packets);
+	if(itr_port->poisson_result < global_threshold) {
 		itr_port->wait_alert++;
 		itr_port->is_suspicious = true;
 		if(itr_port->wait_alert >= wait_alert_sys) {
@@ -584,8 +585,8 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	// printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
-	// 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	 printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
+	 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 
@@ -640,8 +641,8 @@ void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 			set_baselines(itr_port);
 		}else{
 			if(itr_port->new_baseline < MINIMUM_BASELINE){
-				printf("Baseline too small, reseting\n");
-				printf("Port_name: %d, Current packets: %d, threshold: %.2f, Baseline: %.2f\n", ntohs(itr_port->port_name),itr_port->current_packets, package_threshold*itr_port->new_baseline, itr_port->new_baseline);
+				// printf("Baseline too small, reseting\n");
+				// printf("Port_name: %d, Current packets: %d, threshold: %.2f, Baseline: %.2f\n", ntohs(itr_port->port_name),itr_port->current_packets, package_threshold*itr_port->new_baseline, itr_port->new_baseline);
 				gettimeofday(&itr_port->time_of_detection,NULL);
 				itr_port -> new_baseline = 0;
 				itr_port -> old_baseline = 0;
