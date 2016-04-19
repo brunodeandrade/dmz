@@ -21,9 +21,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "ndpi_api.h"
+#include "../../../include/ndpi_api.h"
 #include "../include/node.h"
-#include "sort.h"
+#include "../include/sort.h"
 
 /* reallocation step for AC_NODE_t.matched_patterns */
 #define REALLOC_CHUNK_MATCHSTR 8
@@ -31,7 +31,7 @@
 /* reallocation step for AC_NODE_t.outgoing array */
 #define REALLOC_CHUNK_OUTGOING 8
 /* TODO: For different depth of node, number of outgoing edges differs
-   considerably, It is efficient to use different chunk size for 
+   considerably, It is efficient to use different chunk size for
    different depths */
 
 /* Private function prototype */
@@ -183,7 +183,7 @@ void node_register_matchstr (AC_NODE_t * thiz, AC_PATTERN_t * str)
   /* Manage memory */
   if (thiz->matched_patterns_num >= thiz->matched_patterns_max)
     {
-      thiz->matched_patterns = (AC_PATTERN_t *) ndpi_realloc 
+      thiz->matched_patterns = (AC_PATTERN_t *) ndpi_realloc
 	(thiz->matched_patterns, thiz->matched_patterns_max*sizeof(AC_PATTERN_t),
 	 (REALLOC_CHUNK_MATCHSTR+thiz->matched_patterns_max)*sizeof(AC_PATTERN_t));
 
@@ -205,7 +205,7 @@ void node_register_outgoing
 {
   if(thiz->outgoing_degree >= thiz->outgoing_max)
     {
-      thiz->outgoing = (struct edge *) ndpi_realloc 
+      thiz->outgoing = (struct edge *) ndpi_realloc
 	(thiz->outgoing, thiz->outgoing_max*sizeof(struct edge),
 	 (REALLOC_CHUNK_OUTGOING+thiz->outgoing_max)*sizeof(struct edge));
       thiz->outgoing_max += REALLOC_CHUNK_OUTGOING;

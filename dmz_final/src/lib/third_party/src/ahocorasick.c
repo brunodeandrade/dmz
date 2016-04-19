@@ -23,8 +23,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "ndpi_api.h"
-#include "ahocorasick.h"
+#include "../../include/ndpi_api.h"
+#include "../include/ahocorasick.h"
 
 /* Allocation step for automata.all_nodes */
 #define REALLOC_CHUNK_ALLNODES 200

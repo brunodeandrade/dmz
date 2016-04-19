@@ -15,16 +15,16 @@
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with nDPI.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 
-#include "ndpi_api.h"
+#include "../../include/ndpi_api.h"
 
 /* ndpi_main.c */
 extern u_int8_t  ndpi_is_tor_flow(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow);
 
-u_int ndpi_search_tcp_or_udp_raw(struct ndpi_detection_module_struct *ndpi_struct, 
+u_int ndpi_search_tcp_or_udp_raw(struct ndpi_detection_module_struct *ndpi_struct,
 				 u_int8_t protocol,
 				 u_int32_t saddr, u_int32_t daddr, /* host endianess */
 				 u_int16_t sport, u_int16_t dport) /* host endianess */
@@ -38,7 +38,7 @@ u_int ndpi_search_tcp_or_udp_raw(struct ndpi_detection_module_struct *ndpi_struc
   }
 
   if((rc = ndpi_host_ptree_match(ndpi_struct, htonl(saddr))) != NDPI_PROTOCOL_UNKNOWN) return(rc);
-  
+
   return(ndpi_host_ptree_match(ndpi_struct, htonl(daddr)));
 }
 
@@ -59,7 +59,7 @@ void ndpi_search_tcp_or_udp(struct ndpi_detection_module_struct *ndpi_struct, st
   if(packet->udp) sport = ntohs(packet->udp->source), dport = ntohs(packet->udp->dest);
   else if(packet->tcp) sport = ntohs(packet->tcp->source), dport = ntohs(packet->tcp->dest);
   else sport = dport = 0;
-  
+
   if(packet->iph /* IPv4 Only: we need to support packet->iphv6 at some point */) {
     proto = ndpi_search_tcp_or_udp_raw(ndpi_struct,
 				       flow->packet.iph ? flow->packet.iph->protocol :
@@ -68,7 +68,7 @@ void ndpi_search_tcp_or_udp(struct ndpi_detection_module_struct *ndpi_struct, st
 #else
 				       0,
 #endif
-				       ntohl(packet->iph->saddr), 
+				       ntohl(packet->iph->saddr),
 				       ntohl(packet->iph->daddr),
 				       sport, dport);
 

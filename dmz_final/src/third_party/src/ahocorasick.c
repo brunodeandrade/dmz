@@ -23,8 +23,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "ndpi_api.h"
-#include "ahocorasick.h"
+#include "../../include/ndpi_api.h"
+#include "../include/ahocorasick.h"
 
 /* Allocation step for automata.all_nodes */
 #define REALLOC_CHUNK_ALLNODES 200
@@ -305,7 +305,7 @@ static void ac_automata_register_nodeptr (AC_AUTOMATA_t * thiz, AC_NODE_t * node
 {
   if(thiz->all_nodes_num >= thiz->all_nodes_max)
     {
-      thiz->all_nodes = ndpi_realloc(thiz->all_nodes, 
+      thiz->all_nodes = ndpi_realloc(thiz->all_nodes,
 				     thiz->all_nodes_max*sizeof(AC_NODE_t *),
 				     (REALLOC_CHUNK_ALLNODES+thiz->all_nodes_max)*sizeof(AC_NODE_t *)
 				     );
