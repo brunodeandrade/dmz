@@ -560,7 +560,7 @@ void set_baselines(port_node * port_node){
 void verify_poisson(port_node *itr_port) {
 	itr_port->poisson_result = 1 - (1 + (1/poisson((int)(itr_port->current_packets), (int)(itr_port->new_baseline))));
 	// Verificar o motivo de sempre o resultado da poisson estar sendo o mesmo o global_threshold
-    printf("poisson %LF, port_name: %d, global: %f, baseline: %f, packets %d\n", itr_port->poisson_result, ntohs(itr_port->port_name), global_threshold, itr_port->new_baseline, itr_port->current_packets);
+    //printf("poisson %LF, port_name: %d, global: %f, baseline: %f, packets %d\n", itr_port->poisson_result, ntohs(itr_port->port_name), global_threshold, itr_port->new_baseline, itr_port->current_packets);
 	if(itr_port->poisson_result < global_threshold) {
 		itr_port->wait_alert++;
 		itr_port->is_suspicious = true;
