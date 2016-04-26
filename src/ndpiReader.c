@@ -45,7 +45,7 @@
 #include <sys/socket.h>
 // #include "dmz_module.c"
 
-#include "../config.h"
+#include "include/config.h"
 #include "include/ndpi_api.h"
  #include "include/ndpi_define.h"
  #include "include/ndpi_includes.h"

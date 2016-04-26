@@ -27,7 +27,7 @@
 #include <errno.h>
 #include "third_party/include/ahocorasick.h"
 #include "../include/ndpi_api.h"
-#include "../../config.h"
+#include "../include/config.h"
 #include "../include/ndpi_protocols.h"
 // #include "protocols/http.c"
 //  #include "protocols/starcraft.c"

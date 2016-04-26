@@ -5,11 +5,22 @@ NDPI_MAIN=src/lib/ndpi_main.c
 GLIB_FLAGS=$(shell pkg-config --cflags glib-2.0)
 GLIB_LIBS=$(shell pkg-config --libs glib-2.0)
 LIBS= -ljson-c -pthread -lslog -lm -lpcap $(JSON_FLAGS) $(GLIB_FLAGS) -I/src/include
-DEPS = src/include/
+
+dmz_install: ndpiReader.o ndpi_main.o ahocorasick.o  node.o sort.o tcp_udp.o dmz_module.o
+	$(CC)  -o  dmz ndpi_main.o ndpiReader.o  ahocorasick.o  node.o sort.o  tcp_udp.o dmz_module.o $(LIBS) $(GLIB_LIBS)
+
 
 dmz: ndpiReader.o ndpi_main.o ahocorasick.o  node.o sort.o tcp_udp.o dmz_module.o
 	$(CC)  -o  dmz ndpi_main.o ndpiReader.o  ahocorasick.o  node.o sort.o  tcp_udp.o dmz_module.o $(LIBS) $(GLIB_LIBS)
 ndpiReader.o: $(NDPI_READER)
+	apt-get install libjson0 libjson0-dev libglib2.0-dev libpcap0.8-dev
+	mkdir slog
+	cd slog
+	git clone https://github.com/kala13x/slog.git
+	cd slog/src
+	$(MAKE) -C slog/src
+	$(MAKE) install -C slog/src
+	rm -rf slog
 	$(CC) -c $(NDPI_READER) $(LIBS)
 ndpi_main.o:  $(NDPI_MAIN) src/include/ndpi_protocols.h
 	$(CC) -c  $(NDPI_MAIN) src/lib/third_party/include/ahocorasick.h $(LIBS)
@@ -26,3 +37,4 @@ dmz_module.o: src/dmz_module.c
 clean:
 	rm *.o
 	rm dmz
+
