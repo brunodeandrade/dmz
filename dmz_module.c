@@ -35,6 +35,8 @@ typedef struct port_node{
 	float new_baseline;//The result of the learning
 	float old_baseline;
 	struct timeval time_of_detection;
+	float min_adj;
+	float max_adj;
 	ip_alert_list *upper_ips;
 }port_node;
 
@@ -58,13 +60,16 @@ float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
 
-int package_threshold; // a package_threshold, if the current_package * package_threshold is > than baseline, should alert.
+int ATTACK_TOLERANCE; // a ATTACK_TOLERANCE, if the current_package * ATTACK_TOLERANCE is > than baseline, should alert.
 int verify_config; // should tell which verify technique the system is using (0 is poisson, 1 is baseline).
 int learning_mode;
 
 bool is_adding, is_polling;
 int ip_number;
 int ports[66000];
+
+float MIN_ADJ;
+float MAX_ADJ;
 
 void iterator_port(gpointer key, gpointer value, gpointer user_data) {
 	int chave = *(int *)key;
@@ -145,8 +150,8 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d %d %f %d %f %f %d %d",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&package_threshold,
- 		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode);
+	fscanf(config_file,"%d %d %d %f %d %f %f %d %d %f %f",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&ATTACK_TOLERANCE,
+ 		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode, &MIN_ADJ, &MAX_ADJ);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
 		slog(1, SLOG_ERROR, " Parâmetros inválidos. Por favor verifique se R0 + R1 < 1.\n");
@@ -160,9 +165,9 @@ int load_file(){
 	printf("\nTempo para aprendizado: %d segundos cada poll\n", POLL_TIME);
 	printf("Tempo total de aprendizado: %d polls\n", learning_time_sys);
 	printf("Tempo de espera (WAIT_ALERT): %d polls\n", wait_alert_sys);
-	printf("Limiar de detecção: %dx\n", package_threshold);
+	printf("Limiar de detecção: %dx\n", ATTACK_TOLERANCE);
 	printf("Tipo de deteccao: %d\n\n", learning_mode);
-	//printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,package_threshold);
+	//printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global package threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,ATTACK_TOLERANCE);
 	return 0;
 }
 
@@ -213,6 +218,8 @@ port_node * create_port_node(int port_name, int current_packets){
 	node->new_baseline = 0;
 	node->old_baseline = 0;
 	node->wait_alert = 0;
+	node->min_adj = 0;
+	node->max_adj =0;
 	node->port_name = port_name;
 	node->current_packets = current_packets;
 	node->learnt = false;
@@ -542,6 +549,11 @@ bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 
 }
 
+void adjust_max_and_min(port_node * port_node){
+	port_node->max_adj = (ATTACK_TOLERANCE * port_node->new_baseline) - port_node->new_baseline*MAX_ADJ;
+	port_node->min_adj = port_node->new_baseline*MIN_ADJ;
+}
+
 /*
 * Set baselines
 */
@@ -581,12 +593,12 @@ char *int_to_string(const unsigned int port_name){
 }
 
 /*
-* verifiy if baseline is above package_threshold
+* verifiy if baseline is above ATTACK_TOLERANCE
 */
 void verify_baseline(port_node *port){
 	 printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
-	 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
-	if(port->current_packets > (port->new_baseline * package_threshold)){
+	 	ntohs(port->port_name),port->current_packets, ATTACK_TOLERANCE*port->new_baseline, port->new_baseline);
+	if(port->current_packets > (port->new_baseline * ATTACK_TOLERANCE)){
 		port->wait_alert++;
 
 
@@ -602,9 +614,16 @@ void verify_baseline(port_node *port){
 		
 	} else {
 		if (learning_mode == DYNAMIC){
-			//printf("Port_name: %d, Current packets: %d, Old threshold: %.2f, Old Baseline: %.2f\n", ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
-			set_baselines(port);
-			//printf("Port_name: %d, Current packets: %d, New threshold: %.2f, New Baseline: %.2f\n", ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+			//printf("Port_name: %d, Current packets: %d, Old threshold: %.2f, Old Baseline: %.2f\n", ntohs(port->port_name),port->current_packets, ATTACK_TOLERANCE*port->new_baseline, port->new_baseline);
+			//the current packets value should be between 1 and node->min_adj OR between node->max_adj and current_packets * ATTACK_TOLERANCE
+			if((port->current_packets > 0 && port->current_packets <= port->min_adj) || 
+				(port->current_packets >= port->max_adj && port->current_packets < port->current_packets*ATTACK_TOLERANCE)){
+				printf("updating: old_baseline: %f, old min_adj: %f, old max_adj: %f,\n",port->new_baseline, port->min_adj, port->max_adj);
+				set_baselines(port);
+				adjust_max_and_min(port);
+				printf("updating: new_baseline: %f, new min_adj: %f, new max_adj: %f,\n",port->new_baseline, port->min_adj, port->max_adj);
+			}
+			//printf("Port_name: %d, Current packets: %d, New threshold: %.2f, New Baseline: %.2f\n", ntohs(port->port_name),port->current_packets, ATTACK_TOLERANCE*port->new_baseline, port->new_baseline);
 		}
 	}
 	delete_all(port->upper_ips);
@@ -639,6 +658,9 @@ void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 		if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 			set_baselines(itr_port);
 		}else{
+			if (learning_mode == DYNAMIC){
+				adjust_max_and_min(itr_port);
+			}
 			itr_port->learnt = true;
 		}
 	}
