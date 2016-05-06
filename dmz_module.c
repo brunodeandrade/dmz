@@ -57,7 +57,6 @@ int static_baseline;
 float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
-int MINIMUM_BASELINE;
 
 int package_threshold; // a package_threshold, if the current_package * package_threshold is > than baseline, should alert.
 int verify_config; // should tell which verify technique the system is using (0 is poisson, 1 is baseline).
@@ -146,8 +145,8 @@ int load_file(){
 		return -1;
 	}
 
-	fscanf(config_file,"%d %d %d %f %d %f %f %d %d %d",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&package_threshold,
-		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode, &MINIMUM_BASELINE);
+	fscanf(config_file,"%d %d %d %f %d %f %f %d %d",&wait_alert_sys,&learning_time_sys,&static_baseline,&global_threshold,&package_threshold,
+ 		&R0_BASELINE,&R1_BASELINE,&verify_config, &learning_mode);
 
 	if ((R0_BASELINE + R1_BASELINE) >= 1.0){
 		slog(1, SLOG_ERROR, " Parâmetros inválidos. Por favor verifique se R0 + R1 < 1.\n");
@@ -640,15 +639,7 @@ void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 		if(still_has_to_learn(itr_port->time_of_detection,itr_port->learning_time)){
 			set_baselines(itr_port);
 		}else{
-			if(itr_port->new_baseline < MINIMUM_BASELINE){
-				// printf("Baseline too small, reseting\n");
-				// printf("Port_name: %d, Current packets: %d, threshold: %.2f, Baseline: %.2f\n", ntohs(itr_port->port_name),itr_port->current_packets, package_threshold*itr_port->new_baseline, itr_port->new_baseline);
-				gettimeofday(&itr_port->time_of_detection,NULL);
-				itr_port -> new_baseline = 0;
-				itr_port -> old_baseline = 0;
-			}else{
-				itr_port->learnt = true;
-			}
+			itr_port->learnt = true;
 		}
 	}
 }
