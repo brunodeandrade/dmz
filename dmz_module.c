@@ -617,6 +617,7 @@ void verify_baseline(port_node *port){
 
 void verify_flow(port_node *port){
 	/* printf("\n\nconfig: %d\n\n\n", verify_config); */
+	printf("current: %d\n", port->current_packets);
 	if(port->current_packets > 0){
 		switch (verify_config){
 			case 0: 
@@ -630,8 +631,8 @@ void verify_flow(port_node *port){
 }
 
 void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
-
 	port_node *itr_port = (port_node *) value;
+	printf("porta: %d\n", ntohs(itr_port -> port_name)); 
 
 	if(itr_port->learnt){
 		verify_flow(itr_port);
