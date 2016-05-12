@@ -357,12 +357,12 @@ void print_ips_by_port(port_node * port){
 				// printf("\t %d - IP: %s - Pacotes: %d\n",i+1,top_senders[i].upper_name, top_senders[i].packets);
 
 
-				slog(1, SLOG_NONE, "\t[TOPSND] %d -  Top Sender IP %s (upper_ip: %d) with packets: %d", i+1, top_senders[i].upper_name, ntohs(top_senders[i].upper_ip), top_senders[i].packets);
+				slog(1, SLOG_NONE, "\t[TOPSND] %d - Top Sender IP %s with packets: %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 				top_senders[i].packets = 0;
 			}
 		}
 		else {
-			slog(4, SLOG_NONE, "\t[SND] %d Other Sender IP %s with packets %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
+			slog(4, SLOG_NONE, "[SND] %d Other Sender IP %s with packets %d", i+1, top_senders[i].upper_name, top_senders[i].packets);
 		}
 	}
 
@@ -584,8 +584,8 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	 printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
-	 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
+	 //printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
+	 //	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
 	if(port->current_packets > (port->new_baseline * package_threshold)){
 		port->wait_alert++;
 
@@ -617,7 +617,7 @@ void verify_baseline(port_node *port){
 
 void verify_flow(port_node *port){
 	/* printf("\n\nconfig: %d\n\n\n", verify_config); */
-	printf("current: %d\n", port->current_packets);
+	//printf("current: %d\n", port->current_packets);
 	if(port->current_packets > 0){
 		switch (verify_config){
 			case 0: 
@@ -632,7 +632,7 @@ void verify_flow(port_node *port){
 
 void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 	port_node *itr_port = (port_node *) value;
-	printf("porta: %d\n", ntohs(itr_port -> port_name)); 
+	//printf("porta: %d\n", ntohs(itr_port -> port_name)); 
 
 	if(itr_port->learnt){
 		verify_flow(itr_port);
