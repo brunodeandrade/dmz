@@ -29,7 +29,9 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
+#include <string.h>
 
+#define _GNU_SOURCE
 #define PACKETSIZE	64
 struct packet
 {
@@ -169,7 +171,6 @@ int latency(char *ip){
         listener();
     else
         ping(&addr);
-    wait(0);
 
 	return 0;
 }
