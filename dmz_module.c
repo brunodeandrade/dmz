@@ -685,4 +685,13 @@ void * continuous_learning(){
 }
 
 
+/*
+ * Verify the latency
+*/
 
+void verify_latency(){
+    /* Any ip to test */
+    char *ip = "192.168.40.11";
+    double a = latency(ip);
+    printf("test latency: %lf\n", a);
+}
