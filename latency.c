@@ -1,27 +1,3 @@
-/* myping.c
- *
- * Copyright (c) 2000 Sean Walton and Macmillan Publishers.  Use may be in
- * whole or in part in accordance to the General Public License (GPL).
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
-*/
-
-/*****************************************************************************/
-/*** myping.c                                                              ***/
-/***                                                                       ***/
-/*** Use the ICMP protocol to request "echo" from destination.             ***/
-/*****************************************************************************/
-
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -30,6 +6,8 @@
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define _GNU_SOURCE
 #define PACKETSIZE	64
@@ -60,9 +38,6 @@ unsigned short checksum(void *b, int len)
 	return result;
 }
 
-/*--------------------------------------------------------------------*/
-/*--- display - present echo info                                  ---*/
-/*--------------------------------------------------------------------*/
 void display(void *buf, int bytes)
 {	int i;
 	struct iphdr *ip = buf;
@@ -74,11 +49,11 @@ void display(void *buf, int bytes)
 		if ( !(i & 15) ) printf("\nX:  ", i);
 		printf("X ", ((unsigned char*)buf)[i]);
 	}
+    printf("dst=%s\n", inet_ntoa(ip->daddr));
 	printf("\n");
 	printf("IPv%d: hdr-size=%d pkt-size=%d protocol=%d TTL=%d src=%s ",
 		ip->version, ip->ihl*4, ntohs(ip->tot_len), ip->protocol,
 		ip->ttl, inet_ntoa(ip->saddr));
-	printf("dst=%s\n", inet_ntoa(ip->daddr));
 	if ( icmp->un.echo.id == pid )
 	{
 		printf("ICMP: type[%d/%d] checksum[%d] id[%d] seq[%d]\n",
@@ -87,9 +62,6 @@ void display(void *buf, int bytes)
 	}
 }
 
-/*--------------------------------------------------------------------*/
-/*--- listener - separate process to listen for and collect messages--*/
-/*--------------------------------------------------------------------*/
 void listener(void)
 {	int sd;
 	struct sockaddr_in addr;
@@ -114,14 +86,13 @@ void listener(void)
 	exit(0);
 }
 
-/*--------------------------------------------------------------------*/
-/*--- ping - Create message and send it.                           ---*/
-/*--------------------------------------------------------------------*/
-void ping(struct sockaddr_in *addr)
+int *ping(struct sockaddr_in *addr)
 {	const int val=255;
 	int i, sd, cnt=1;
 	struct packet pckt;
 	struct sockaddr_in r_addr;
+    int *ping_time;
+    ping_time = malloc(11 * sizeof(int));
 
 	sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
 	if ( sd < 0 )
