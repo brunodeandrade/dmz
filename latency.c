@@ -126,16 +126,27 @@ int *ping(struct sockaddr_in *addr)
 		pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
 		if ( sendto(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)addr, sizeof(*addr)) <= 0 )
 			perror("sendto");
-		sleep(1);
+		sleep(0.5);
 	}
+    return ping_time;
 }
 
-/*--------------------------------------------------------------------*/
-/*--- main - look up host and start ping processes.                ---*/
-/*--------------------------------------------------------------------*/
-int latency(char *ip){
+double calculate_latency_time(int *ping_time){
+    double sum = 0;
+    int i;
+    for (i = 1; i <= 10; i++) {
+        sum += ping_time[i] - ping_time[i-1];
+        printf("%lf\n", sum);
+    }
+    double average_time = sum/9;
+    return average_time;
+}
+
+double latency(char *ip){
     struct hostent *hname;
 	struct sockaddr_in addr;
+
+    double average_latency = 0;
 
     pid = getpid();
     proto = getprotobyname("ICMP");
@@ -146,9 +157,9 @@ int latency(char *ip){
     addr.sin_addr.s_addr = *(long*)hname->h_addr;
     if ( fork() == 0 )
         listener();
-    else
-        ping(&addr);
+    else{
+        average_latency = calculate_latency_time(ping(&addr));
+    }
 
-	return 0;
+	return average_latency;
 }
-
