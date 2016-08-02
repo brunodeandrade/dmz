@@ -104,13 +104,19 @@ int *ping(struct sockaddr_in *addr)
 		perror("Set TTL option");
 	if ( fcntl(sd, F_SETFL, O_NONBLOCK) != 0 )
 		perror("Request nonblocking I/O");
-	for (;;)
-	{	int len=sizeof(r_addr);
 
-		printf("Msg #%d\n", cnt);
-		if ( recvfrom(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)&r_addr, &len) > 0 )
-			printf("***Got message!***\n");
-		bzero(&pckt, sizeof(pckt));
+    int count = 0;
+    ping_time[count] = time(NULL);
+
+	for (count = 1; count <= 10 ; count++)
+    {	int len=sizeof(r_addr);
+
+        printf("Msg #%d\n", cnt);
+        if ( recvfrom(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)&r_addr, &len) > 0 ){
+            ping_time[count] = time(NULL);
+            printf("%ld\n", ping_time[count]);
+        }
+        bzero(&pckt, sizeof(pckt));
 		pckt.hdr.type = ICMP_ECHO;
 		pckt.hdr.un.echo.id = pid;
 		for ( i = 0; i < sizeof(pckt.msg)-1; i++ )
