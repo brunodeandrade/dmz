@@ -1,7 +1,7 @@
 # Instalação DMZ
 
 1. Caso esteja em sistemas Debian-like, execute o comando:
-	$ sudo make dmz_install
+	$ sudo make install
 
 2. Em seguida, execute 
 	$ sudo ./dmz -i eth0.
@@ -15,7 +15,7 @@
 	        $ make
 	        $ sudo make install
 
-3. Em seguida, execute o comando?
+3. Em seguida, execute o comando:
 	$ make
 
 4. E logo após:

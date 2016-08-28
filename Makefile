@@ -6,7 +6,7 @@ GLIB_FLAGS=$(shell pkg-config --cflags glib-2.0)
 GLIB_LIBS=$(shell pkg-config --libs glib-2.0)
 LIBS= -ljson-c -pthread -lslog -lm -lpcap $(JSON_FLAGS) $(GLIB_FLAGS) -I/src/include
 
-dmz_install: ndpiReader.o ndpi_main.o ahocorasick.o  node.o sort.o tcp_udp.o dmz_module.o
+install: ndpiReader.o ndpi_main.o ahocorasick.o  node.o sort.o tcp_udp.o dmz_module.o
 	$(CC)  -o  dmz ndpi_main.o ndpiReader.o  ahocorasick.o  node.o sort.o  tcp_udp.o dmz_module.o $(LIBS) $(GLIB_LIBS)
 
 
