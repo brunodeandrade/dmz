@@ -9,7 +9,7 @@
 #include "linked_list.c"
 #include "slog.h"
 
-#define POLL_TIME 10
+#define POLL_TIME 20
 #define MAX_CACHE 1000000
 #define NUMBER_TOP_SENDERS 10
 
@@ -243,7 +243,7 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 			g_hash_table_remove(ip->icmp_ports, &ports[port->port_name]);
 			break;
 		default:
-			slog(1, SLOG_ERROR, "Protocolo desconhecido @ remove_port()\n"); 
+			//slog(1, SLOG_ERROR, "Protocolo desconhecido @ remove_port()\n"); 
 			break;
 	}
 	
@@ -272,7 +272,7 @@ void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *por
 			g_hash_table_insert(ip_node->icmp_ports,&ports[port_name],port);			
 			break;
 		default: 
-			slog(1, SLOG_ERROR, "Protocolo desconhecido @ insert_port_in_hash()\n"); 
+			//slog(1, SLOG_ERROR, "Protocolo desconhecido @ insert_port_in_hash()\n"); 
 			break;
 	}
 
@@ -298,7 +298,7 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 		findable_port = g_hash_table_lookup(ip_node->icmp_ports,&ports[port_name]);
 		break;
 	default: 
-		slog(1, SLOG_ERROR, "Protocolo desconhecido @ find_port()\n"); 
+		//slog(1, SLOG_ERROR, "Protocolo desconhecido @ find_port()\n"); 
 		break;
 	}
 
@@ -584,9 +584,7 @@ char *int_to_string(const unsigned int port_name){
 * verifiy if baseline is above package_threshold
 */
 void verify_baseline(port_node *port){
-	 printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",
-	 	ntohs(port->port_name),port->current_packets, package_threshold*port->new_baseline, port->new_baseline);
-	if(port->current_packets > (port->new_baseline * package_threshold)){
+	if(port->current_packets > (port->new_baseline * package_threshold + 10)){
 		port->wait_alert++;
 
 
@@ -594,7 +592,10 @@ void verify_baseline(port_node *port){
 
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
-			print_ips_by_port(port);
+			printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets,
+				 package_threshold*port->new_baseline, port->new_baseline);
+
+       	 		print_ips_by_port(port);
 		}	
 	} else if(port->wait_alert > 0){
 		port->wait_alert = 0;
@@ -669,6 +670,7 @@ void iterate_to_learn() {
 void * continuous_learning(){
 	int i = 0;
 	while(true){
+		printf("polling\n");
 		if(!is_adding) {
 			is_polling = true;
 			printf("--------------------------\n");

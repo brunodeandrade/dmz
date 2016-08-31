@@ -1098,6 +1098,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
     for(i=0; i<NUM_ROOTS; i++) {
       ndpi_tdestroy(ndpi_thread_info[thread_id].ndpi_flows_root[i], ndpi_flow_freer);
       ndpi_thread_info[thread_id].ndpi_flows_root[i] = NULL;
+      ndpi_thread_info[thread_id].stats.ndpi_flow_count = 0;
     }
   
   /*DMZ*/

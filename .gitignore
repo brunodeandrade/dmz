@@ -8,4 +8,4 @@ Win32/
 ndpiReader
 *.log
 TestingDmzDOS/
-
+*.log.save*
