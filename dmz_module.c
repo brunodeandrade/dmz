@@ -321,7 +321,7 @@ int cmpfunc (const void * a, const void * b) {
 void print_ips_by_port(port_node * port){
 
 	//The strclr doesn't work on normal editors, such as, sublime, vim...
-	slog(0, SLOG_NONE, "[%s] Ataque na porta %d", strclr(CLR_RED, "ATK"),ntohs(port->port_name));
+	slog(0, SLOG_NONE, "[%s] Ataque na porta %d", strclr(CLR_RED, "ATK"),port->port_name);
 	
 
 	ip_alert * itr = port->upper_ips->head, *next = NULL;
@@ -434,7 +434,7 @@ void find_port_and_increment (ip_node * ip_node, u_short protocol_id, int port_n
 * Adds an IP node to the hash list
 */
 void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name, u_short protocol_id, int port_name , int current_packets){
-
+	//printf ("IP NODE: %s, IP PORT: %d\n", lower_name, port_name);
 	if(!is_polling) {
 
 			is_adding = true;
@@ -588,11 +588,11 @@ void verify_baseline(port_node *port){
 		port->wait_alert++;
 
 
-		slog(1, SLOG_WARN, "Fluxo suspeito na porta %d",ntohs(port->port_name));
+		slog(1, SLOG_WARN, "Fluxo suspeito na porta %d",port->port_name);
 
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
-			printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",ntohs(port->port_name),port->current_packets,
+			printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",port->port_name,port->current_packets,
 				 package_threshold*port->new_baseline, port->new_baseline);
 
        	 		print_ips_by_port(port);
@@ -670,7 +670,6 @@ void iterate_to_learn() {
 void * continuous_learning(){
 	int i = 0;
 	while(true){
-		printf("polling\n");
 		if(!is_adding) {
 			is_polling = true;
 			printf("--------------------------\n");
