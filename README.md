@@ -2,7 +2,8 @@
 
 
 - Antes de instalar o DMZ, instale as seguintes bibliotecas:
-	$ sudo apt-get install libjson0 libjson0-dev libglib2.0-dev 
+	$ sudo apt-get install libjson0 libjson0-dev libglib2.0-dev git autoconf libtool libpcap-dev
+- Aconselha-se instalar na pasta /opt
 - Instale o slog: 
 	$ git clone https://github.com/kala13x/slog.git
         $ cd slog/src
@@ -11,7 +12,9 @@
 ## DMZ
 
 1. Baixe o código-fonte da nDPI no repositório oficial (https://github.com/ntop/nDPI.git);
-2. Assegure-se que o código está na versão do commit com a hash:
+2. Assegure-se que o código está na versão do commit com a hash, usando o comando:
+   git checkout e9f7df081fe5a405a462a85218ecf66e858ea99a -b dmz
+3. Ao digitar git log, o resultado deverá ser:
 	e9f7df081fe5a405a462a85218ecf66e858ea99a
 	Merge: d0b83a7 e7cb3d3
 	Author: Luca <deri@ntop.org>
@@ -24,7 +27,7 @@
 
 4. Caso o ./configure dê erro, será necessário baixar as bibliotecas que faltam (o log mostrará quais bibliotecas necessitam ser baixadas).
 
-5. Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/ (inclusive a pasta oculta .git).
+5. Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/ (inclusive a pasta oculta .git, que deve ser copiada separadamente).
 
 6. Execute o comando:
 	
