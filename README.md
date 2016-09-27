@@ -43,7 +43,6 @@ Na pasta nDPI/ execute os comandos:
 ./autogen.sh
 ./configure
 ```
-Caso o ```./configure``` dê erro, será necessário baixar as bibliotecas que faltam (o log mostrará quais bibliotecas necessitam ser baixadas).
 
 Após a instalação da nDPI, volte a pasta /opt
 
@@ -60,7 +59,7 @@ Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/
 cp -r . /opt/nDPI/example/
 ```
 
-Execute os comandos:
+Execute os comandos: (QUAIS FLAGS???)
 ```bash
 pkg-config --cflags --libs glib-2.0
 pkg-config --cflags --libs json	
@@ -77,6 +76,7 @@ Execute um make clean na pasta nDPI/example, e em seguida um make.
 ```bash
 cd /opt/nDPI/example
 make clean
+make
 ```
 Na pasta nDPI/example, execute a aplicação com o comando:
 ```bash
@@ -84,3 +84,4 @@ cd /opt/nDPI/example
 sudo ./ndpiReader -i eth0
 ```
 
+![Imgur](http://i.imgur.com/fLXemNS.png)
