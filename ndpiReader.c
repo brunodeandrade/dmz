@@ -771,13 +771,13 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
   if(l4_packet_len > ndpi_thread_info[thread_id].stats.max_packet_len)
     ndpi_thread_info[thread_id].stats.max_packet_len = l4_packet_len;
 
-  if(iph->saddr < iph->daddr) {
+  /*if(iph->saddr < iph->daddr){
     lower_ip = iph->saddr;
     upper_ip = iph->daddr;
-  } else {
+  } else {*/
     lower_ip = iph->daddr;
     upper_ip = iph->saddr;
-  }
+  //}
 
   *proto = iph->protocol;
   l4 = ((u_int8_t *) l3 + l4_offset);
@@ -788,13 +788,17 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
     ndpi_thread_info[thread_id].stats.tcp_count++;
 
     // tcp
+    //TODO: SOURCE E DEST ESTAO INVERTIDAS, VOLTAR AO ORIGINAL
     *tcph = (struct ndpi_tcphdr *)l4;
-    *sport = ntohs((*tcph)->source), *dport = ntohs((*tcph)->dest);
-    
-    if(iph->saddr < iph->daddr) {
-      lower_port = (*tcph)->source, upper_port = (*tcph)->dest;
+    *sport = ntohs((*tcph)->dest), *dport = ntohs((*tcph)->source);
+    /*if((*tcph)->source == 47873)
+       printf("port source: %d\n",ntohs((*tcph)->source));
+    if((*tcph) -> dest != 47873)
+      printf("port dest: %d\n", ntohs((*tcph)->dest));*/
+   /* if(iph->saddr < iph->daddr) {*/
+      lower_port = (*tcph)->dest, upper_port = (*tcph)->source;
       *src_to_dst_direction = 1;
-    } else {
+    /*} else {
       lower_port = (*tcph)->dest;
       upper_port = (*tcph)->source;
 
@@ -807,7 +811,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
     upper_port = p;
   }
       }
-    }
+    }*/
     
     tcp_len = ndpi_min(4*(*tcph)->doff, l4_packet_len);
     *payload = &l4[tcp_len];
@@ -821,10 +825,10 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
     *payload = &l4[sizeof(struct ndpi_udphdr)];
     *payload_len = ndpi_max(0, l4_packet_len-sizeof(struct ndpi_udphdr));
 
-    if(iph->saddr < iph->daddr) {
+   /* if(iph->saddr < iph->daddr) {*/
       lower_port = (*udph)->source, upper_port = (*udph)->dest;
       *src_to_dst_direction = 1;
-    } else {
+   /* } else {
       lower_port = (*udph)->dest, upper_port = (*udph)->source;
 
       *src_to_dst_direction = 0;
@@ -837,7 +841,7 @@ static struct ndpi_flow *get_ndpi_flow(u_int16_t thread_id,
     upper_port = p;
   }
       }
-    }
+    }*/
 
     *sport = ntohs(lower_port), *dport = ntohs(upper_port);
   } else {
@@ -1053,7 +1057,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
   }
   //method for add the ip node in hash table, saltar dmz_module.
 
-  add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,(int)flow->lower_port,flow->packets);
+  add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,ntohs(flow->lower_port),flow->packets);
   /* and a little bit of black magic */
   int count = ndpi_thread_info[thread_id].stats.ndpi_flow_count;
   //printf("Number of flows: %d\n", ndpi_thread_info[thread_id].stats.ndpi_flow_count);
@@ -1098,6 +1102,7 @@ static unsigned int packet_processing(u_int16_t thread_id,
     for(i=0; i<NUM_ROOTS; i++) {
       ndpi_tdestroy(ndpi_thread_info[thread_id].ndpi_flows_root[i], ndpi_flow_freer);
       ndpi_thread_info[thread_id].ndpi_flows_root[i] = NULL;
+      ndpi_thread_info[thread_id].stats.ndpi_flow_count = 0;
     }
   
   /*DMZ*/
