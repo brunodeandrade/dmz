@@ -63,15 +63,15 @@ Execute os comandos:
 ```bash
 pkg-config --cflags --libs glib-2.0
 ```
-![Imgur](http://i.imgur.com/fLXemNS.png)
+![Imgur](http://i.imgur.com/zFubdBz.png)
 ```
 pkg-config --cflags --libs json	
 ```
-![Imgur](http://i.imgur.com/fLXemNS.png)
+![Imgur](http://i.imgur.com/9Mg4pD3.png)
 
 Copie as flags que apareceram no console e coloque na variável CFLAGS do Makefile da pasta **example/** (substitua as flags que já existem mantendo apenas o -g e -lm).
 A linha do arquivo deverá ficar assim:
-![Imgur](http://i.imgur.com/fLXemNS.png)
+![Imgur](http://i.imgur.com/zrABXhh.png)
 
 Execute o make na pasta nDPI/
 ```bash
