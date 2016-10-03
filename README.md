@@ -59,18 +59,15 @@ Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/
 cp -r . /opt/nDPI/example/
 ```
 
-Execute os comandos:
+No arquivo Makefile dentro da pasta /opt/nDPI/example, procure a flag CFLAGS conforme mostra a imagem e substitua por tudo, exceto o '-g' e o '-lm' pelo seguinte comando:
 ```bash
-pkg-config --cflags --libs glib-2.0
+$(shell pkg-config --cflags --libs json glib-2.0)
 ```
-![Imgur](http://i.imgur.com/zFubdBz.png)
-```
-pkg-config --cflags --libs json	
-```
-![Imgur](http://i.imgur.com/9Mg4pD3.png)
 
-Copie as flags que apareceram no console e coloque na variável CFLAGS do Makefile da pasta **example/** (substitua as flags que já existem mantendo apenas o -g e -lm).
-A linha do arquivo deverá ficar assim:
+E substitua a flag LDFLAGS pelo comando:
+```bash
+$(shell pkg-config --libs json)
+```
 ![Imgur](http://i.imgur.com/zrABXhh.png)
 
 Execute o make na pasta nDPI/
