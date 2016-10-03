@@ -63,12 +63,13 @@ No arquivo Makefile dentro da pasta /opt/nDPI/example, procure a flag CFLAGS con
 ```bash
 $(shell pkg-config --cflags --libs json glib-2.0)
 ```
+![Imgur](http://i.imgur.com/i1fkfzc.png)
 
 E substitua a flag LDFLAGS pelo comando:
 ```bash
 $(shell pkg-config --libs json)
 ```
-![Imgur](http://i.imgur.com/zrABXhh.png)
+![Imgur](http://i.imgur.com/Y0CUQTY.png)
 
 Execute o make na pasta nDPI/
 ```bash
