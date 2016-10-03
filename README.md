@@ -69,7 +69,7 @@ E substitua a flag LDFLAGS pelo comando:
 ```bash
 $(shell pkg-config --libs json)
 ```
-![Imgur](http://i.imgur.com/Y0CUQTY.png)
+![Imgur](http://i.imgur.com/UI4Gmry.png)
 
 Execute o make na pasta nDPI/
 ```bash
