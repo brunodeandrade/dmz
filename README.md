@@ -90,3 +90,89 @@ sudo ./ndpiReader -i eth0
 ```
 
 ![Imgur](http://i.imgur.com/fLXemNS.png)
+
+# Teste da Aplicação
+Agora iremos executar os testes a fim de verificar o funcionamento correto da aplicadação.
+
+Primeiramente, ela deve ser parada. Pode-se fazer isto utilizando o Ctrl + c.
+
+Temos a necessidade de iniciar um serviço para receber pacotes e então, realizarmos os
+testes. Para tanto, iremos utilizar o apache2, para deixar disponível o acesso HTTP
+na porta 80.
+
+```bash
+$ sudo apt-get install apache2
+```
+
+## Instalação
+Agora iremos baixar um script de testes.
+
+Para isso, utilize uma máquina diferente da máquina que possui o DMZ em execução.
+Essa máquina será a atacante e iremos enviar pacotes a partir dela.
+
+Digite o seguinte comando:
+```bash
+$ git clone https://github.com/TiagoAssuncao/suite-attacks-dos
+```
+Assim, iremos entrar na pasta e instalar as dependências.
+
+```bash
+$ cd suite-attacks-dos
+
+$ sudo apt-get install hping3
+```
+
+Para compilar o código, basta apenas executar o comando make.
+```bash
+$ make
+```
+
+Agora iremos a partir desta máquina(atacante), enviar pacotes para o alvo
+(servidor com o apache2 em funcionamento).
+
+O IP do servidor tem que ser analisado
+no momento do ataque, pois, este pode ser alterado confirme a rede. Neste nosso
+caso de teste, o ip do servidor é 192.168.20.91. Assim, iremos iniciar a aplicação
+enviando pacotes para este IP. Antes de começarmos, vá no servidor e inicie novamente
+a aplicação DMZ.
+
+```bash
+$ cd /opt/nDPI/example
+$ sudo ./ndpiReader -i eth0
+```
+
+O script de testes irá mandar um fluxo baixo de pacotes para o servidor durante
+450 segundos. Este fluxo irá setar o aprendizado do DMZ com esta quantidade de pacotes. Após,
+iremos aumentar o fluxo em 5 vezes durante 300 segundos. Isso irá gerar um alerta
+de Warning durante 4 polls e no quinto, será sinalizado o ataque. Enfim, vamos ao
+ataque. Rode este comando na máquina atacante:
+
+```bash
+$ ./run -s 192.168.20.91
+```
+
+A saída esperada são confirmações dos pacotes enviados. Com o fluxo de um por segundo:
+
+```bash
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1189 win=29200 rtt=4.3 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1190 win=29200 rtt=8.3 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1191 win=29200 rtt=4.3 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1192 win=29200 rtt=4.3 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1193 win=29200 rtt=4.3 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1194 win=29200 rtt=11.7 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1195 win=29200 rtt=23.4 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1196 win=29200 rtt=3.2 ms
+
+len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1197 win=29200 rtt=3.3 ms
+...
+```
+
+Após os 450 segundos, a saída esperada será a mesma, porém, com o fluxo de 5 pacotes
+por segundo.
