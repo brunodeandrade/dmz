@@ -148,7 +148,7 @@ de Warning durante 4 polls e no quinto, será sinalizado o ataque. Enfim, vamos 
 ataque. Rode este comando na máquina atacante:
 
 ```bash
-$ ./run -s 192.168.20.91
+$ sudo ./run -s 192.168.20.91
 ```
 
 A saída esperada são confirmações dos pacotes enviados. Com o fluxo de um por segundo:
