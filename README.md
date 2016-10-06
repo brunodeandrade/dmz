@@ -6,7 +6,7 @@ Antes de instalar o DMZ, instale as seguintes bibliotecas:
 ```bash
 sudo apt-get install libjson0 libjson0-dev libglib2.0-dev git autoconf libtool libpcap-dev
 ```
-Instale o slog: 
+Instale o slog:
 ```bash
 git clone https://github.com/kala13x/slog.git
 cd slog/src
@@ -19,7 +19,7 @@ Baixe o código-fonte da nDPI no repositório oficial (https://github.com/ntop/n
 git clone https://github.com/ntop/nDPI.git
 ```
 
-Entre na pasta clonada da nDPI 
+Entre na pasta clonada da nDPI
 ```bash
 cd nDPI
 ```
@@ -54,7 +54,7 @@ Clone o repositório do DMZ
 ```bash
 git clone https://gitlab.com/saltar/dmz-module.git
 ```
-Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/ 
+Copie todos os arquivos da pasta dmz_module para a pasta nDPI/example/
 ```bash
 cp -r . /opt/nDPI/example/
 ```
@@ -92,13 +92,15 @@ sudo ./ndpiReader -i eth0
 ![Imgur](http://i.imgur.com/fLXemNS.png)
 
 # Teste da Aplicação
-Agora iremos executar os testes a fim de verificar o funcionamento correto da aplicadação.
+Agora iremos executar os testes a fim de verificar o funcionamento correto da
+aplicação(sudo ./ndpiReader -i eth0).
 
-Primeiramente, ela deve ser parada. Pode-se fazer isto utilizando o Ctrl + c.
+Primeiramente, a aplicação (sudo ./ndpiReader -i eth0) deve ser parada.
+Pode-se fazer isto utilizando o Ctrl + c.
 
-Temos a necessidade de iniciar um serviço para receber pacotes e então, realizarmos os
+Temos a necessidade de iniciar um serviço no servidor para receber pacotes e então, realizarmos os
 testes. Para tanto, iremos utilizar o apache2, para deixar disponível o acesso HTTP
-na porta 80.
+na porta 80 no servidor.
 
 ```bash
 $ sudo apt-get install apache2
@@ -107,8 +109,7 @@ $ sudo apt-get install apache2
 ## Instalação
 Agora iremos baixar um script de testes.
 
-Para isso, utilize uma máquina diferente da máquina que possui o DMZ em execução.
-Essa máquina será a atacante e iremos enviar pacotes a partir dela.
+Para isso, utilize o cliente de ataque.
 
 Digite o seguinte comando:
 ```bash
@@ -127,13 +128,10 @@ Para compilar o código, basta apenas executar o comando make.
 $ make
 ```
 
-Agora iremos a partir desta máquina(atacante), enviar pacotes para o alvo
-(servidor com o apache2 em funcionamento).
+Agora iremos a partir do cliente atacante, enviar pacotes para o alvo.
 
-O IP do servidor tem que ser analisado
-no momento do ataque, pois, este pode ser alterado confirme a rede. Neste nosso
-caso de teste, o ip do servidor é 192.168.20.91. Assim, iremos iniciar a aplicação
-enviando pacotes para este IP. Antes de começarmos, vá no servidor e inicie novamente
+Assim, o script (run) iniciará a aplicação
+enviando pacotes para o servidor. Antes de começarmos, vá no servidor e inicie novamente
 a aplicação DMZ.
 
 ```bash
@@ -142,8 +140,8 @@ $ sudo ./ndpiReader -i eth0
 ```
 
 O script de testes irá mandar um fluxo baixo de pacotes para o servidor durante
-450 segundos. Este fluxo irá setar o aprendizado do DMZ com esta quantidade de pacotes. Após,
-iremos aumentar o fluxo em 5 vezes durante 300 segundos. Isso irá gerar um alerta
+450 segundos. Este fluxo irá realizar o aprendizado do DMZ com esta quantidade de pacotes. Após,
+o script(./run) irá aumentar o fluxo em 5 vezes durante 300 segundos. Isso irá gerar um alerta
 de Warning durante 4 polls e no quinto, será sinalizado o ataque. Enfim, vamos ao
 ataque. Rode este comando na máquina atacante:
 
@@ -151,7 +149,8 @@ ataque. Rode este comando na máquina atacante:
 $ sudo ./run -s 192.168.20.91
 ```
 
-A saída esperada são confirmações dos pacotes enviados. Com o fluxo de um por segundo:
+A saída esperada do script de teste, no cliente atacante, são as confirmações dos pacotes enviados.
+Com o fluxo de um por segundo:
 
 ```bash
 len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1189 win=29200 rtt=4.3 ms
@@ -181,3 +180,6 @@ A saída esperada no servidor onde se encontra o DMZ para os warings e para o at
 é a seguinte:
 
 ![OutputLog](https://raw.githubusercontent.com/wiki/TiagoAssuncao/suite-attacks-dos/atc.png)
+
+ATK entre colchetes indicam que o ataque foi detectando.
+Bem como WARN indicam que foram identificados alertas de tráfego malicioso.
