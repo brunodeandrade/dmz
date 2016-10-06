@@ -176,3 +176,8 @@ len=44 ip=192.168.20.91 ttl=63 DF id=0 sport=80 flags=SA seq=1197 win=29200 rtt=
 
 Após os 450 segundos, a saída esperada será a mesma, porém, com o fluxo de 5 pacotes
 por segundo.
+
+A saída esperada no servidor onde se encontra o DMZ para os warings e para o ataque
+é a seguinte:
+
+![OutputLog](https://raw.githubusercontent.com/wiki/TiagoAssuncao/suite-attacks-dos/atc.png)
