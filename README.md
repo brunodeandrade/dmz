@@ -91,7 +91,7 @@ sudo ./ndpiReader -i eth0
 
 ![Imgur](http://i.imgur.com/fLXemNS.png)
 
-#Teste da Aplicação
+# Teste da Aplicação
 Agora iremos executar os testes a fim de verificar o funcionamento correto da aplicadação.
 
 Primeiramente, ela deve ser parada. Pode-se fazer isto utilizando o Ctrl + c.
@@ -137,8 +137,8 @@ enviando pacotes para este IP. Antes de começarmos, vá no servidor e inicie no
 a aplicação DMZ.
 
 ```bash
-cd /opt/nDPI/example
-sudo ./ndpiReader -i eth0
+$ cd /opt/nDPI/example
+$ sudo ./ndpiReader -i eth0
 ```
 
 O script de testes irá mandar um fluxo baixo de pacotes para o servidor durante
