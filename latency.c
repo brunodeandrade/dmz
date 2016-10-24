@@ -13,8 +13,8 @@
 #define PACKETSIZE	64
 struct packet
 {
-	struct icmphdr hdr;
-	char msg[PACKETSIZE-sizeof(struct icmphdr)];
+    struct icmphdr hdr;
+    char msg[PACKETSIZE-sizeof(struct icmphdr)];
 };
 
 int pid=-1;
@@ -25,91 +25,91 @@ struct protoent *proto=NULL;
 /*--------------------------------------------------------------------*/
 unsigned short checksum(void *b, int len)
 {	unsigned short *buf = b;
-	unsigned int sum=0;
-	unsigned short result;
+    unsigned int sum=0;
+    unsigned short result;
 
-	for ( sum = 0; len > 1; len -= 2 )
-		sum += *buf++;
-	if ( len == 1 )
-		sum += *(unsigned char*)buf;
-	sum = (sum >> 16) + (sum & 0xFFFF);
-	sum += (sum >> 16);
-	result = ~sum;
-	return result;
+    for ( sum = 0; len > 1; len -= 2 )
+        sum += *buf++;
+    if ( len == 1 )
+        sum += *(unsigned char*)buf;
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    result = ~sum;
+    return result;
 }
 
 void display(void *buf, int bytes)
 {	int i;
-	struct iphdr *ip = buf;
-	struct icmphdr *icmp = buf+ip->ihl*4;
+    struct iphdr *ip = buf;
+    struct icmphdr *icmp = buf+ip->ihl*4;
 
-	printf("----------------\n");
-	for ( i = 0; i < bytes; i++ )
-	{
-		if ( !(i & 15) ) printf("\nX:  ", i);
-		printf("X ", ((unsigned char*)buf)[i]);
-	}
+    printf("----------------\n");
+    for ( i = 0; i < bytes; i++ )
+    {
+        if ( !(i & 15) ) printf("\nX:  ", i);
+        printf("X ", ((unsigned char*)buf)[i]);
+    }
     printf("dst=%s\n", inet_ntoa(ip->daddr));
-	printf("\n");
-	printf("IPv%d: hdr-size=%d pkt-size=%d protocol=%d TTL=%d src=%s ",
-		ip->version, ip->ihl*4, ntohs(ip->tot_len), ip->protocol,
-		ip->ttl, inet_ntoa(ip->saddr));
-	if ( icmp->un.echo.id == pid )
-	{
-		printf("ICMP: type[%d/%d] checksum[%d] id[%d] seq[%d]\n",
-			icmp->type, icmp->code, ntohs(icmp->checksum),
-			icmp->un.echo.id, icmp->un.echo.sequence);
-	}
+    printf("\n");
+    printf("IPv%d: hdr-size=%d pkt-size=%d protocol=%d TTL=%d src=%s ",
+            ip->version, ip->ihl*4, ntohs(ip->tot_len), ip->protocol,
+            ip->ttl, inet_ntoa(ip->saddr));
+    if ( icmp->un.echo.id == pid )
+    {
+        printf("ICMP: type[%d/%d] checksum[%d] id[%d] seq[%d]\n",
+                icmp->type, icmp->code, ntohs(icmp->checksum),
+                icmp->un.echo.id, icmp->un.echo.sequence);
+    }
 }
 
 void listener(void)
 {	int sd;
-	struct sockaddr_in addr;
-	unsigned char buf[1024];
+    struct sockaddr_in addr;
+    unsigned char buf[1024];
 
-	sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
-	if ( sd < 0 )
-	{
-		perror("socket");
-		exit(0);
-	}
-	for (;;)
-	{	int bytes, len=sizeof(addr);
+    sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
+    if ( sd < 0 )
+    {
+        perror("socket");
+        exit(0);
+    }
+    for (;;)
+    {	int bytes, len=sizeof(addr);
 
-		bzero(buf, sizeof(buf));
-		bytes = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&addr, &len);
-		if ( bytes > 0 )
-			display(buf, bytes);
-		else
-			perror("recvfrom");
-	}
-	exit(0);
+        bzero(buf, sizeof(buf));
+        bytes = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&addr, &len);
+        if ( bytes > 0 )
+            display(buf, bytes);
+        else
+            perror("recvfrom");
+    }
+    exit(0);
 }
 
 int *ping(struct sockaddr_in *addr)
 {	const int val=255;
-	int i, sd, cnt=1;
-	struct packet pckt;
-	struct sockaddr_in r_addr;
+    int i, sd, cnt=1;
+    struct packet pckt;
+    struct sockaddr_in r_addr;
     int *ping_time;
     ping_time = malloc(11 * sizeof(int));
 
-	sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
-	if ( sd < 0 )
-	{
-		perror("socket");
-		return;
-	}
-	if ( setsockopt(sd, SOL_IP, IP_TTL, &val, sizeof(val)) != 0)
-		perror("Set TTL option");
-	if ( fcntl(sd, F_SETFL, O_NONBLOCK) != 0 )
-		perror("Request nonblocking I/O");
+    sd = socket(PF_INET, SOCK_RAW, proto->p_proto);
+    if ( sd < 0 )
+    {
+        perror("socket");
+        return;
+    }
+    if ( setsockopt(sd, SOL_IP, IP_TTL, &val, sizeof(val)) != 0)
+        perror("Set TTL option");
+    if ( fcntl(sd, F_SETFL, O_NONBLOCK) != 0 )
+        perror("Request nonblocking I/O");
 
     int count = 0;
     ping_time[count] = time(NULL);
 
-	for (count = 1; count <= 10 ; count++)
-    {	int len=sizeof(r_addr);
+    for (count = 1; count <= 10 ; count++) {
+        int len=sizeof(r_addr);
 
         printf("Msg #%d\n", cnt);
         if ( recvfrom(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)&r_addr, &len) > 0 ){
@@ -117,17 +117,17 @@ int *ping(struct sockaddr_in *addr)
             printf("%ld\n", ping_time[count]);
         }
         bzero(&pckt, sizeof(pckt));
-		pckt.hdr.type = ICMP_ECHO;
-		pckt.hdr.un.echo.id = pid;
-		for ( i = 0; i < sizeof(pckt.msg)-1; i++ )
-			pckt.msg[i] = i+'0';
-		pckt.msg[i] = 0;
-		pckt.hdr.un.echo.sequence = cnt++;
-		pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
-		if ( sendto(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)addr, sizeof(*addr)) <= 0 )
-			perror("sendto");
-		sleep(0.5);
-	}
+        pckt.hdr.type = ICMP_ECHO;
+        pckt.hdr.un.echo.id = pid;
+        for ( i = 0; i < sizeof(pckt.msg)-1; i++ )
+            pckt.msg[i] = i+'0';
+        pckt.msg[i] = 0;
+        pckt.hdr.un.echo.sequence = cnt++;
+        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
+        if ( sendto(sd, &pckt, sizeof(pckt), 0, (struct sockaddr*)addr, sizeof(*addr)) <= 0 )
+            perror("sendto");
+        sleep(1);
+    }
     return ping_time;
 }
 
@@ -136,15 +136,15 @@ double calculate_latency_time(int *ping_time){
     int i;
     for (i = 1; i <= 10; i++) {
         sum += ping_time[i] - ping_time[i-1];
-        printf("%lf\n", sum);
     }
+    printf("%lf\n", sum);
     double average_time = sum/9;
     return average_time;
 }
 
 double latency(char *ip){
     struct hostent *hname;
-	struct sockaddr_in addr;
+    struct sockaddr_in addr;
 
     double average_latency = 0;
 
@@ -159,7 +159,16 @@ double latency(char *ip){
         listener();
     else{
         average_latency = calculate_latency_time(ping(&addr));
+        printf("%lf\n", average_latency);
     }
 
-	return average_latency;
+    return average_latency;
+}
+
+int main(int argc, char *argv[])
+{
+    char *ip = malloc(10 * sizeof(char));
+    ip = "192.168.20.154";
+    latency(ip);
+    return 0;
 }
