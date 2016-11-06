@@ -24,6 +24,10 @@ enum {false, true};
 enum {STATIC, DYNAMIC};
 
 
+/*
+Struct for each port and its status.
+*/
+
 typedef struct port_node{
 	int port_name;
 	int current_packets;
@@ -38,6 +42,9 @@ typedef struct port_node{
 	ip_alert_list *upper_ips;
 }port_node;
 
+/*
+Struct for each ip address and its hash ports.
+*/
 typedef struct ip_node{	
 	int lower_ip;//primary key
 	char * ip_name;
@@ -48,24 +55,29 @@ typedef struct ip_node{
 
 
 GHashTable * ip_list;
-//ip_node * to_learn_list = NULL;
-//ip_node * learnt_list = NULL;
 
+
+/*
+Global system configuration variables.
+*/
 int wait_alert_sys; //wait time until the throw of an alert, defined by the user for the whole system
 int learning_time_sys; //learning time of the algorithm, defined by the user for the whole system
 int static_baseline;
 float global_threshold;
 float R0_BASELINE;
 float R1_BASELINE;
-
 int package_threshold; // a package_threshold, if the current_package * package_threshold is > than baseline, should alert.
 int verify_config; // should tell which verify technique the system is using (0 is poisson, 1 is baseline).
 int learning_mode;
+
 
 bool is_adding, is_polling;
 int ip_number;
 int ports[66000];
 
+/*
+Function that reads a given Hash and print it's key|value for each port.
+*/
 void iterator_port(gpointer key, gpointer value, gpointer user_data) {
 	int chave = *(int *)key;
 	port_node *port = (port_node *) value;
@@ -74,7 +86,9 @@ void iterator_port(gpointer key, gpointer value, gpointer user_data) {
 }
 
 
-
+/*
+Function that reads a given Hash and print it's key|value for each ip address.
+*/
 void iterator(gpointer key, gpointer value, gpointer user_data) {
 	int chave = *(int *)key;
 	ip_node *ip = (ip_node *) value;
@@ -85,8 +99,11 @@ void iterator(gpointer key, gpointer value, gpointer user_data) {
 }
 
 
-
-int init_cache() {
+/*
+Init the cache for the dmz module. The ip list is created 
+and all the possibles ips are stored into an array.
+*/
+int init_cache()        {
 
 	ip_list = g_hash_table_new (g_direct_hash,g_int_equal);
 
@@ -107,14 +124,12 @@ int init_cache() {
     */ 
     slog_init("report", "log.conf", 3, 3, 1);
     slog(2, SLOG_INFO, " Execução Iniciada");
-
-    /*
-    	Examples to print the log 
-	    slog(3, SLOG_INFO, " Just file");
-		slog(0, SLOG_WARN, teste);
-    */
 }
 
+/*
+The poisson function used to calculate baselines in case of the 
+POISSON configuration is selected.
+*/
 long double poisson(int k, int lam)     {
 
         int c = 1;
@@ -138,6 +153,10 @@ long double poisson(int k, int lam)     {
 }
 
 
+/*
+Load the configuration file and all it's params. 
+The archive must be a .txt extension and should be named "config".
+*/
 int load_file(){
 	FILE * config_file = fopen("config.txt","r");
 	if(!config_file){
@@ -174,7 +193,7 @@ void print_info(long ip_number, char *ip_name, u_short protocol, int lower_port,
 }
 
 /*
-*Creates a new ip_node
+*Creates a new ip_node for the given ip_node structure.
 *
 */
 ip_node * create_ip_node(char * ip_name, int lower_ip){
@@ -192,7 +211,7 @@ ip_node * create_ip_node(char * ip_name, int lower_ip){
 }
 
 /*
-*Creates a port node
+*Creates a port node for the given port_node structure.
 *
 */
 port_node * create_port_node(int port_name, int current_packets){
@@ -224,7 +243,7 @@ port_node * create_port_node(int port_name, int current_packets){
 }
 
 /*
-* Remove port from list
+* Remove port from the hash list
 */
 void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 
@@ -250,7 +269,7 @@ void remove_port(ip_node * ip, port_node * port, u_short protocol_id){
 }
 
 /*
-*Inserts a new port in the hash of the node
+*Inserts a new port in the hash of the ip_node
 *
 */
 void insert_port_in_hash (ip_node * ip_node, u_short protocol_id, port_node *port,int port_name) {
@@ -306,6 +325,9 @@ port_node * find_port(ip_node * ip_node, u_short protocol_id, int port_name){
 	return findable_port;
 }
 
+/*
+Function that compares values for the hash lib.
+*/
 int cmpfunc (const void * a, const void * b) {
 
 	ip_alert *ip_alert_a = (ip_alert *)a;
@@ -316,7 +338,7 @@ int cmpfunc (const void * a, const void * b) {
 
 
 /*
-* Find ip's for a given PORT
+* Find ip's for a given PORT, it also logs all the top senders and show them.
 */
 void print_ips_by_port(port_node * port){
 
@@ -368,6 +390,9 @@ void print_ips_by_port(port_node * port){
 
 }
 
+/*
+Find a node that contains a given upper_ip value.
+*/
 void find_upper_ip_and_increment (port_node *port, int upper_ip, char *upper_name,  int current_packets) {
 
 	ip_alert *findable_upper = NULL;
@@ -456,13 +481,18 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 	}
 }
 
-
+/*
+Free function for the glib.
+*/
 static gboolean free_value(gpointer key, gpointer value, gpointer user_data) {
 
 	g_free(value);
 	return true;
 }
 
+/*
+Iterate over all hash nodes and delete/free them.
+*/
 static gboolean iterator_and_delete_ips(gpointer key, gpointer value, gpointer user_data) {
 	ip_node *ip = (ip_node *) value;
 
@@ -488,7 +518,9 @@ void free_hash_list(GHashTable * hash_list){
 	
 }
 
-
+/*
+PRINT FUNCTIONS
+*/
 void iterate_and_print_ports(gpointer key, gpointer value, gpointer user_data) {
 	port_node *port = (port_node *)value;
 
@@ -510,9 +542,6 @@ void iterate_and_print_ips(gpointer key, gpointer value, gpointer user_data) {
  	//printf(user_data, *(gint*)key, value);
 }
 
-/*
-* Print Hash
-*/
 void print_hash(){
 	ip_node * itr;
 	port_node *irt_port;
@@ -527,6 +556,10 @@ void print_hash(){
 	free_hash_list(ip_list);
 }
 
+/*
+Function that receives the actual time and the give learn time 
+of a port and returns if it still has to learn or not.
+*/
 bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 	struct timeval now;
 	gettimeofday(&now,NULL);
@@ -543,7 +576,7 @@ bool still_has_to_learn(struct timeval time_of_detection, int learning_time){
 }
 
 /*
-* Set baselines
+* Set baselines of a given port.
 */
 void set_baselines(port_node * port_node){
 
@@ -555,7 +588,6 @@ void set_baselines(port_node * port_node){
 /*
 * Verify poisson if above threshold
 */
-
 void verify_poisson(port_node *itr_port) {
 	itr_port->poisson_result = 1 - (1 + (1/poisson((int)(itr_port->current_packets), (int)(itr_port->new_baseline))));
 	// Verificar o motivo de sempre o resultado da poisson estar sendo o mesmo o global_threshold
@@ -574,12 +606,6 @@ void verify_poisson(port_node *itr_port) {
 	delete_all(itr_port->upper_ips);
 	itr_port->current_packets = 0;
 }
-
-// TODO DElete this method
-char *int_to_string(const unsigned int port_name){
-
-}
-
 /*
 * verifiy if baseline is above package_threshold
 */
@@ -630,6 +656,9 @@ void verify_flow(port_node *port){
 	}
 }
 
+/*
+Iterate over ports and verify it's flow.
+*/
 void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 
 	port_node *itr_port = (port_node *) value;
@@ -645,6 +674,10 @@ void iterator_ports(gpointer key, gpointer value, gpointer user_data) {
 	}
 }
 
+
+/*
+Iterate over ips and submit each hash to verify its flow.
+*/
 void iterator_ips(gpointer key, gpointer value, gpointer user_data) {
 	ip_node *ip = (ip_node *) value;
 
