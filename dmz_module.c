@@ -72,6 +72,7 @@ int learning_mode;
 
 
 bool is_adding, is_polling;
+pthread_mutex_t lock;
 int ip_number;
 int ports[66000];
 
@@ -704,6 +705,7 @@ void * continuous_learning(){
 	int i = 0;
 	while(true){
 		if(!is_adding) {
+			pthread_mutex_lock(&lock);
 			is_polling = true;
 			printf("--------------------------\n");
 			printf("POLL %d\n",i);
@@ -711,6 +713,7 @@ void * continuous_learning(){
 			iterate_to_learn();
 			//iterate_learnt(ip_list);
 			is_polling = false;
+			pthread_mutex_unlock(&lock);
 			//printf("Sleeping...\n");
 			sleep(POLL_TIME);
 			i++;
