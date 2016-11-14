@@ -463,7 +463,8 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 	//printf ("IP NODE: %s, IP PORT: %d\n", lower_name, port_name);
 	if(!is_polling) {
 
-			is_adding = true;
+			// is_adding = true;
+			pthread_mutex_lock(&lock);
 
 			ip_node * findable_ip = NULL;
 
@@ -477,7 +478,8 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 				insert_port_in_hash(ip,protocol_id,port,port_name);
 				g_hash_table_insert(ip_list,&lower_ip,ip);
 			}	
-			is_adding = false;
+			// is_adding = false;
+			pthread_mutex_unlock(&lock);
 
 	}
 }
@@ -703,8 +705,11 @@ void iterate_to_learn() {
 */
 void * continuous_learning(){
 	int i = 0;
+	pthread_mutex_init(&lock, NULL);
+
+
 	while(true){
-		if(!is_adding) {
+
 			pthread_mutex_lock(&lock);
 			is_polling = true;
 			printf("--------------------------\n");
@@ -717,7 +722,7 @@ void * continuous_learning(){
 			//printf("Sleeping...\n");
 			sleep(POLL_TIME);
 			i++;
-		}
+		
 	}
 }
 
