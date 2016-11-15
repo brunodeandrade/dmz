@@ -337,15 +337,11 @@ int cmpfunc (const void * a, const void * b) {
 	return ( ip_alert_b->packets - ip_alert_a->packets );
 }
 
-
 /*
-* Find ip's for a given PORT, it also logs all the top senders and show them.
+Find a node that contains a given upper_ip value.
 */
-void print_ips_by_port(port_node * port){
 
-	//The strclr doesn't work on normal editors, such as, sublime, vim...
-	slog(0, SLOG_NONE, "[%s] Ataque na porta %d", strclr(CLR_RED, "ATK"),port->port_name);
-	
+void iterate_upper_ips (port_node *port) {
 
 	ip_alert * itr = port->upper_ips->head, *next = NULL;
 	ip_alert * top_senders = NULL;
@@ -389,11 +385,22 @@ void print_ips_by_port(port_node * port){
 		}
 	}
 
+
+
 }
 
 /*
-Find a node that contains a given upper_ip value.
+* Find ip's for a given PORT
 */
+void print_ips_by_port(port_node * port){
+
+	//The strclr doesn't work on normal editors, such as, sublime, vim...
+	slog(0, SLOG_NONE, "[%s] Ataque na porta %d", strclr(CLR_RED, "ATK"),port->port_name);
+	
+	iterate_upper_ips(port);
+	
+}
+
 void find_upper_ip_and_increment (port_node *port, int upper_ip, char *upper_name,  int current_packets) {
 
 	ip_alert *findable_upper = NULL;
@@ -618,7 +625,7 @@ void verify_baseline(port_node *port){
 
 
 		slog(1, SLOG_WARN, "Fluxo suspeito na porta %d",port->port_name);
-
+		iterate_upper_ips(port);
 		port->is_suspicious = true;
 		if(port->wait_alert >= wait_alert_sys) {
 			printf("Port_name: %d, Current packets: %d, Current threshold: %.2f, Current Baseline: %.2f\n",port->port_name,port->current_packets,
