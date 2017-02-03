@@ -8,10 +8,13 @@
 #include <tgmath.h>
 #include "linked_list.c"
 #include "slog.h"
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define POLL_TIME 20
 #define MAX_CACHE 1000000
 #define NUMBER_TOP_SENDERS 10
+
 
 long double cache_log[MAX_CACHE];
 long double cache_sum[MAX_CACHE];
@@ -83,7 +86,7 @@ void iterator_port(gpointer key, gpointer value, gpointer user_data) {
 	int chave = *(int *)key;
 	port_node *port = (port_node *) value;
 
-	printf("\t Chave: %d, Port: %d\n",chave, port->port_name);
+	slog(1, SLOG_NONE,"\t Chave: %d, Port: %d\n",chave, port->port_name);
 }
 
 
@@ -94,7 +97,7 @@ void iterator(gpointer key, gpointer value, gpointer user_data) {
 	int chave = *(int *)key;
 	ip_node *ip = (ip_node *) value;
 
-	printf("IP: %s  Ports:\n", ip->ip_name);
+	slog(1, SLOG_NONE,"IP: %s  Ports:\n", ip->ip_name);
 	g_hash_table_foreach(ip->udp_ports, (GHFunc)iterator_port, NULL);
  	//printf(user_data, *(gint*)key, value);
 }
@@ -102,11 +105,11 @@ void iterator(gpointer key, gpointer value, gpointer user_data) {
 
 /*
 Init the cache for the dmz module. The ip list is created 
-and all the possibles ips are stored into an array.
+and all the possibles ports are stored into an array.
 */
 int init_cache()        {
 
-	ip_list = g_hash_table_new (g_direct_hash,g_int_equal);
+	ip_list = g_hash_table_new (g_direct_hash,g_direct_equal);
 
     int i=1;
 
@@ -471,11 +474,11 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 	if(!is_polling) {
 
 			// is_adding = true;
-			pthread_mutex_lock(&lock);
+			// pthread_mutex_lock(&lock);
 
-			ip_node * findable_ip = NULL;
-
-			findable_ip = g_hash_table_lookup(ip_list,&lower_ip);
+			ip_node * findable_ip = NULL;	
+			gpointer *lower_ip_pointer = GINT_TO_POINTER(lower_ip);
+			findable_ip = g_hash_table_lookup(ip_list,lower_ip_pointer);
 			
 			if(findable_ip){		
 				find_port_and_increment(findable_ip,protocol_id, port_name, current_packets,upper_ip,upper_name);
@@ -483,7 +486,8 @@ void add_to_hash(int upper_ip,int lower_ip, char * upper_name, char * lower_name
 				port_node * port = create_port_node(port_name, current_packets);
 				ip_node * ip = create_ip_node(lower_name,lower_ip);
 				insert_port_in_hash(ip,protocol_id,port,port_name);
-				g_hash_table_insert(ip_list,&lower_ip,ip);
+				g_hash_table_insert(ip_list,lower_ip_pointer,ip);
+				// slog(1, SLOG_NONE,"Adicionou o ip: %s\n",lower_name);
 			}	
 			// is_adding = false;
 			pthread_mutex_unlock(&lock);
@@ -534,21 +538,26 @@ PRINT FUNCTIONS
 void iterate_and_print_ports(gpointer key, gpointer value, gpointer user_data) {
 	port_node *port = (port_node *)value;
 
-	//printf("           Port: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d\n",ntohs(port->port_name),port->current_packets,port->new_baseline,port->time_of_detection);
+	slog(1, SLOG_NONE,"           \tPort: %d, Current Packets: %d, Baseline: %f \t Detected Time: %d",port->port_name,port->current_packets,port->new_baseline,port->time_of_detection);
  	//printf(user_data, *(gint*)key, value);
 }
 
 void iterate_and_print_ips(gpointer key, gpointer value, gpointer user_data) {
 	ip_node *ip = (ip_node *) value;
 
-	printf("\t%d - IP: %s\n",ip_number++,ip->ip_name);
-	printf("         TCP\n");
+	struct in_addr addr = {ip->lower_ip};
+    char *dot_ip = inet_ntoa(addr);
+	
+	slog(1, SLOG_NONE,"IP: %s",dot_ip);
+	slog(1, SLOG_NONE,"         TCP");
 	g_hash_table_foreach(ip->tcp_ports, (GHFunc)iterate_and_print_ports, NULL);
 
-	printf("         UDP\n");
+	slog(1, SLOG_NONE,"         UDP");
 	g_hash_table_foreach(ip->udp_ports, (GHFunc)iterate_and_print_ports, NULL);
-	printf("         ICMP\n");
-	g_hash_table_foreach(ip->icmp_ports, (GHFunc)iterate_and_print_ports, NULL);
+	slog(1, SLOG_NONE,"\n\n");
+
+	// slog(1, SLOG_NONE,"         ICMP\n");
+	// g_hash_table_foreach(ip->icmp_ports, (GHFunc)iterate_and_print_ports, NULL);
  	//printf(user_data, *(gint*)key, value);
 }
 
@@ -557,13 +566,13 @@ void print_hash(){
 	port_node *irt_port;
 	int ip_number = 0;
 
-	printf("\n\tHash:\n");
+	slog(1, SLOG_NONE,"\n\tHash:\n");
 
 	g_hash_table_foreach(ip_list, (GHFunc)iterate_and_print_ips, NULL);
 
 
 	printf("Wait alert is %d, the learning time is %d, the static baseline is %d and the global threshold is %f \n\n\n", wait_alert_sys, learning_time_sys,static_baseline,global_threshold);
-	free_hash_list(ip_list);
+	//free_hash_list(ip_list);
 }
 
 /*
@@ -707,6 +716,7 @@ void iterate_to_learn() {
 	g_hash_table_foreach(ip_list, (GHFunc)iterator_ips, NULL);
 }
 
+
 /*
 * Learning Control - Poll Iteration
 */
@@ -719,15 +729,17 @@ void * continuous_learning(){
 
 			pthread_mutex_lock(&lock);
 			is_polling = true;
-			printf("--------------------------\n");
-			printf("POLL %d\n",i);
-			printf("--------------------------\n");
+			slog(1, SLOG_NONE, "--------------------------\n");
+			slog(1, SLOG_NONE, "POLL %d\n",i);
+			slog(1, SLOG_NONE, "--------------------------\n");
 			iterate_to_learn();
+			print_hash();
 			//iterate_learnt(ip_list);
 			is_polling = false;
 			pthread_mutex_unlock(&lock);
 			//printf("Sleeping...\n");
 			sleep(POLL_TIME);
+			
 			i++;
 		
 	}

@@ -1056,8 +1056,9 @@ static unsigned int packet_processing(u_int16_t thread_id,
     return(0);
   }
   //method for add the ip node in hash table, saltar dmz_module.
-
+  pthread_mutex_lock(&lock);
   add_to_hash(flow->upper_ip,flow->lower_ip,flow->upper_name,flow->lower_name,(short)flow->protocol,ntohs(flow->lower_port),flow->packets);
+  // pthread_mutex_unlock(&lock);
   /* and a little bit of black magic */
   int count = ndpi_thread_info[thread_id].stats.ndpi_flow_count;
   //printf("Number of flows: %d\n", ndpi_thread_info[thread_id].stats.ndpi_flow_count);
